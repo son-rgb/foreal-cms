@@ -103,6 +103,12 @@ const [tagList, setTagList] = useState([
   "프로모션",
 ]);
 const [contentList, setContentList] = useState(initialContents);
+const [selectedContent, setSelectedContent] = useState<any>(null);
+const [isEditMode, setIsEditMode] = useState(false);
+const [editBrand, setEditBrand] = useState("");
+const [editTag, setEditTag] = useState("");
+const [editStartDate, setEditStartDate] = useState("");
+const [editEndDate, setEditEndDate] = useState("");
 const [uploadStartDate, setUploadStartDate] = useState("");
 const [uploadEndDate, setUploadEndDate] = useState("");
 const [uploadBrand, setUploadBrand] = useState("");
@@ -189,6 +195,40 @@ endDate: uploadEndDate,
   setNewTag("");
   setIsUploadModalOpen(false);
 };
+const handleDeleteContent = () => {
+  if (!selectedContent) return;
+
+  const isConfirmed = confirm("이 콘텐츠를 삭제하시겠습니까?");
+
+  if (!isConfirmed) return;
+
+  setContentList(
+    contentList.filter((content) => content.name !== selectedContent.name)
+  );
+
+  setSelectedContent(null);
+  setCurrentPage("content");
+};
+const handleSaveEdit = () => {
+  if (!selectedContent) return;
+
+  const updatedContent = {
+    ...selectedContent,
+    brand: editBrand,
+    tag: editTag,
+    startDate: editStartDate,
+    endDate: editEndDate,
+  };
+
+  setContentList(
+    contentList.map((content) =>
+      content.name === selectedContent.name ? updatedContent : content
+    )
+  );
+
+  setSelectedContent(updatedContent);
+  setIsEditMode(false);
+};
 const handleAddTag = () => {
   const trimmedTag = newTag.trim();
 
@@ -224,6 +264,7 @@ const handleAddTag = () => {
   style={currentPage === "content" ? activeMenuStyle : menuItemStyle}
   onClick={() => setCurrentPage("content")}
 >
+
   콘텐츠 관리
 </div>
           <div style={menuItemStyle}>편성 관리</div>
@@ -428,7 +469,14 @@ const handleAddTag = () => {
 
         <tbody>
           {contentList.map((content) => (
-            <tr key={content.name}>
+            <tr
+  key={content.name}
+  onClick={() => {
+        setSelectedContent(content);
+    setCurrentPage("contentDetail");
+  }}
+  style={{ cursor: "pointer" }}
+>
               <td style={tdStyle}>
                 <div style={thumbnailStyle}>썸네일</div>
               </td>
@@ -444,6 +492,146 @@ const handleAddTag = () => {
           ))}
         </tbody>
       </table>
+    </section>
+  </>
+)}
+ {currentPage === "contentDetail" && selectedContent && (
+  <>
+    <section style={summaryBoxStyle}>
+      <div>
+        <h1>콘텐츠 상세정보</h1>
+        <p style={smallText}>콘텐츠 파일 및 송출 정보 확인</p>
+      </div>
+
+      <button
+        style={smallButtonStyle}
+        onClick={() => setCurrentPage("content")}
+      >
+        ← 목록으로
+      </button>
+    </section>
+
+    <section style={twoColumnStyle}>
+      <div style={panelStyle}>
+        <h2>미리보기</h2>
+        <div style={contentPreviewLargeStyle}>
+          {selectedContent.type === "영상" ? "영상 콘텐츠" : "이미지 콘텐츠"}
+        </div>
+      </div>
+
+      <div style={panelStyle}>
+        <h2>콘텐츠 정보</h2>
+
+        <p><strong>콘텐츠명</strong><br />{selectedContent.name}</p>
+        <p><strong>브랜드</strong><br />{selectedContent.brand || "미지정"}</p>
+        <p><strong>태그</strong><br />{selectedContent.tag || "미지정"}</p>
+        <p><strong>콘텐츠 종류</strong><br />{selectedContent.type}</p>
+        <p><strong>해상도</strong><br />{selectedContent.resolution}</p>
+        <p><strong>재생시간</strong><br />{selectedContent.duration}</p>
+        <p><strong>용량</strong><br />{selectedContent.size}</p>
+        <p>
+          <strong>송출 기간</strong><br />
+          {(selectedContent.startDate || "즉시") + " ~ " + (selectedContent.endDate || "무기한")}
+        </p>
+        <p><strong>등록일</strong><br />{selectedContent.date}</p>
+
+        {isEditMode && (
+  <div style={{ marginTop: "20px" }}>
+    <h3>콘텐츠 정보 수정</h3>
+
+    <div style={formGroupStyle}>
+      <label>브랜드</label>
+      <select
+        style={modalInputStyle}
+        value={editBrand}
+        onChange={(e) => setEditBrand(e.target.value)}
+      >
+        <option value="">브랜드 선택</option>
+        {brands.map((brand) => (
+          <option key={brand.name} value={brand.name}>
+            {brand.name}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div style={formGroupStyle}>
+      <label>태그</label>
+      <select
+        style={modalInputStyle}
+        value={editTag}
+        onChange={(e) => setEditTag(e.target.value)}
+      >
+        <option value="">태그 선택</option>
+        {tagList.map((tag) => (
+          <option key={tag} value={tag}>
+            {tag}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div style={dateRowStyle}>
+      <div style={formGroupStyle}>
+        <label>송출 시작일</label>
+        <input
+          type="date"
+          style={modalInputStyle}
+          value={editStartDate}
+          onChange={(e) => setEditStartDate(e.target.value)}
+        />
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>송출 종료일</label>
+        <input
+          type="date"
+          style={modalInputStyle}
+          value={editEndDate}
+          onChange={(e) => setEditEndDate(e.target.value)}
+        />
+      </div>
+    </div>
+
+    <div style={modalFooterStyle}>
+      <button
+        style={closeButtonStyle}
+        onClick={() => setIsEditMode(false)}
+      >
+        취소
+      </button>
+
+      <button
+        style={uploadButtonStyle}
+        onClick={handleSaveEdit}
+      >
+        저장
+      </button>
+    </div>
+  </div>
+)}
+        <div style={modalFooterStyle}>
+          <button
+  style={smallButtonStyle}
+  onClick={() => {
+    setEditBrand(selectedContent.brand || "");
+    setEditTag(selectedContent.tag || "");
+    setEditStartDate(selectedContent.startDate || "");
+    setEditEndDate(selectedContent.endDate || "");
+    setIsEditMode(true);
+  }}
+  
+>
+  수정
+</button>
+          <button
+  style={dangerButtonStyle}
+  onClick={handleDeleteContent}
+>
+  삭제
+</button>
+        </div>
+      </div>
     </section>
   </>
 )}
@@ -581,7 +769,6 @@ const handleAddTag = () => {
     </div>
   </div>
 )}
-
     </main>
   );
 }
@@ -722,4 +909,22 @@ const tagRowStyle = {
   gridTemplateColumns: "1fr 120px",
   gap: "8px",
 };
+const contentPreviewLargeStyle = {
+  height: "420px",
+  borderRadius: "10px",
+  backgroundColor: "#d1d5db",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#374151",
+  fontSize: "18px",
+};
 
+const dangerButtonStyle = {
+  border: "none",
+  backgroundColor: "#ef4444",
+  color: "#ffffff",
+  borderRadius: "6px",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
