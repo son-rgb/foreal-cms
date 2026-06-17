@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const total = 1183;
@@ -61,6 +61,7 @@ export default function Home() {
   ];
   const initialContents = [
   {
+    id: 1,
     name: "세로_260617_AD_프로모션.jpg",
     type: "이미지",
     resolution: "1080x1920",
@@ -70,6 +71,7 @@ export default function Home() {
     date: "2026-06-16",
   },
   {
+    id: 2,
     name: "KFC_치킨버켓_광고.mp4",
     type: "영상",
     resolution: "1080x1920",
@@ -79,6 +81,7 @@ export default function Home() {
     date: "2026-06-16",
   },
   {
+    id: 3,
     name: "CU_여름행사_배너.png",
     type: "이미지",
     resolution: "1080x1920",
@@ -102,10 +105,15 @@ const [tagList, setTagList] = useState([
   "신제품",
   "프로모션",
 ]);
-const [contentList, setContentList] = useState(initialContents);
+const [contentList, setContentList] = useState<any[]>(initialContents);
+const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+const [contentSearchText, setContentSearchText] = useState("");
+const [contentBrandFilter, setContentBrandFilter] = useState("전체");
+const [selectedContentNames, setSelectedContentNames] = useState<string[]>([]);
 const [selectedContent, setSelectedContent] = useState<any>(null);
 const [isEditMode, setIsEditMode] = useState(false);
 const [editBrand, setEditBrand] = useState("");
+const [editName, setEditName] = useState("");
 const [editTag, setEditTag] = useState("");
 const [editStartDate, setEditStartDate] = useState("");
 const [editEndDate, setEditEndDate] = useState("");
@@ -130,6 +138,17 @@ const dashboardDisconnectRate = (
 const filteredDisplays = displays.filter((display) =>
   display.name.toLowerCase().includes(searchText.toLowerCase())
 );
+const filteredContents = contentList.filter((content) => {
+  const matchesSearch = content.name
+    .toLowerCase()
+    .includes(contentSearchText.toLowerCase());
+
+  const matchesBrand =
+    contentBrandFilter === "전체" ||
+    content.brand === contentBrandFilter;
+
+  return matchesSearch && matchesBrand;
+});
 const getContentType = (fileName: string) => {
   const lower = fileName.toLowerCase();
 
@@ -161,21 +180,58 @@ const getFileSize = (size: number) => {
 
   return `${Math.round(size / 1024)}KB`;
 };
+useEffect(() => {
+  const savedContents = localStorage.getItem("foreal-content-list");
 
+  if (savedContents) {
+    setContentList(JSON.parse(savedContents));
+  }
+
+  setIsStorageLoaded(true);
+}, []);
+useEffect(() => {
+  if (!isStorageLoaded) return;
+
+  const contentsForSave = contentList.map((content) => ({
+    ...content,
+    previewUrl: "",
+  }));
+
+  localStorage.setItem(
+    "foreal-content-list",
+    JSON.stringify(contentsForSave)
+  );
+}, [contentList, isStorageLoaded]);
 const handleUpload = () => {
   if (selectedFiles.length === 0) {
-    alert("파일을 선택해주세요.");
+    alert("등록할 파일을 선택해주세요.");
     return;
   }
+const duplicateFiles = selectedFiles.filter((file) =>
+  contentList.some(
+    (content) =>
+      content.name.trim().toLowerCase() ===
+      file.name.trim().toLowerCase()
+  )
+);
 
-  if (!uploadBrand) {
-    alert("브랜드를 선택해주세요.");
-    return;
-  }
-
-  const newContents = selectedFiles.map((file) => ({
+if (duplicateFiles.length > 0) {
+  alert(
+    `이미 등록된 콘텐츠가 있습니다.\n\n${duplicateFiles
+      .map((file) => file.name)
+      .join("\n")}`
+  );
+  return;
+}
+const newContents = selectedFiles.map((file, index) => ({
+  id:
+  Math.max(0, ...contentList.map((content) => content.id || 0)) +
+  index +
+  1,
     name: file.name,
     type: getContentType(file.name),
+    previewUrl: URL.createObjectURL(file),
+    brand: uploadBrand || "미지정",
     resolution: "-",
     duration: "-",
     size: getFileSize(file.size),
@@ -203,26 +259,47 @@ const handleDeleteContent = () => {
   if (!isConfirmed) return;
 
   setContentList(
-    contentList.filter((content) => content.name !== selectedContent.name)
+    contentList.filter((content) => content.id !== selectedContent.id)
   );
 
   setSelectedContent(null);
   setCurrentPage("content");
 };
+const handleDeleteSelectedContents = () => {
+  if (selectedContentNames.length === 0) {
+    alert("삭제할 콘텐츠를 선택해주세요.");
+    return;
+  }
+
+  const isConfirmed = confirm(
+    `${selectedContentNames.length}개의 콘텐츠를 삭제하시겠습니까?`
+  );
+
+  if (!isConfirmed) return;
+
+  setContentList(
+    contentList.filter(
+      (content) => !selectedContentNames.includes(content.name)
+    )
+  );
+
+  setSelectedContentNames([]);
+};
 const handleSaveEdit = () => {
   if (!selectedContent) return;
 
   const updatedContent = {
-    ...selectedContent,
-    brand: editBrand,
-    tag: editTag,
-    startDate: editStartDate,
-    endDate: editEndDate,
-  };
+  ...selectedContent,
+  name: editName,
+  brand: editBrand || "미지정",
+  tag: editTag || "미지정",
+  startDate: editStartDate,
+  endDate: editEndDate,
+};
 
   setContentList(
     contentList.map((content) =>
-      content.name === selectedContent.name ? updatedContent : content
+      content.id === selectedContent.id ? updatedContent : content
     )
   );
 
@@ -429,35 +506,78 @@ const handleAddTag = () => {
         </p>
       </div>
 
-      <button
-  style={uploadButtonStyle}
-  onClick={() => setIsUploadModalOpen(true)}
->
-  콘텐츠 등록
-</button>
+      <div style={{ display: "flex", gap: "8px" }}>
+  <button
+    style={dangerButtonStyle}
+    onClick={handleDeleteSelectedContents}
+  >
+    삭제
+  </button>
+
+  <button
+    style={uploadButtonStyle}
+    onClick={() => setIsUploadModalOpen(true)}
+  >
+    콘텐츠 등록
+  </button>
+</div>
     </section>
 
     <section style={panelStyle}>
       <div style={panelHeaderStyle}>
         <div style={{ display: "flex", gap: "10px" }}>
-          <select style={selectStyle}>
-            <option>전체</option>
-            <option>이미지</option>
-            <option>영상</option>
-          </select>
+          <select
+  style={selectStyle}
+  value={contentBrandFilter}
+  onChange={(e) => setContentBrandFilter(e.target.value)}
+>
+  <option value="전체">전체 브랜드</option>
+  {brands.map((brand) => (
+    <option key={brand.name} value={brand.name}>
+      {brand.name}
+    </option>
+  ))}
+</select>
 
           <input
-            style={searchInputStyle}
-            placeholder="콘텐츠명 검색"
-          />
+  style={searchInputStyle}
+  placeholder="콘텐츠명 검색"
+  value={contentSearchText}
+  onChange={(e) => setContentSearchText(e.target.value)}
+/>
         </div>
       </div>
 
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th style={thStyle}>미리보기</th>
-            <th style={thStyle}>콘텐츠명</th>
+            <th style={{ ...thStyle, width: "50px" }}>NO</th>
+<th style={{ ...thStyle, width: "100px", textAlign: "center" }}>
+  <label style={checkAllStyle}>
+    <input
+      type="checkbox"
+      checked={
+        filteredContents.length > 0 &&
+        filteredContents.every((content) =>
+          selectedContentNames.includes(content.name)
+        )
+      }
+      onChange={(e) => {
+        if (e.target.checked) {
+          setSelectedContentNames(
+            filteredContents.map((content) => content.name)
+          );
+        } else {
+          setSelectedContentNames([]);
+        }
+      }}
+    />
+    선택
+  </label>
+</th>
+<th style={{ ...thStyle, width: "150px" }}>미리보기</th>
+<th style={thStyle}>콘텐츠명</th>
+<th style={{ ...thStyle, width: "110px" }}>브랜드</th>
             <th style={thStyle}>종류</th>
             <th style={thStyle}>해상도</th>
             <th style={thStyle}>재생시간</th>
@@ -468,7 +588,7 @@ const handleAddTag = () => {
         </thead>
 
         <tbody>
-          {contentList.map((content) => (
+          {filteredContents.map((content, index) => (
             <tr
   key={content.name}
   onClick={() => {
@@ -477,17 +597,69 @@ const handleAddTag = () => {
   }}
   style={{ cursor: "pointer" }}
 >
+  <td style={tdStyle}>
+  {contentList.length - index}
+</td>
+
+<td style={tdStyle}>
+  <input
+    type="checkbox"
+    checked={selectedContentNames.includes(content.name)}
+    onClick={(e) => e.stopPropagation()}
+    onChange={(e) => {
+      if (e.target.checked) {
+        setSelectedContentNames([...selectedContentNames, content.name]);
+      } else {
+        setSelectedContentNames(
+          selectedContentNames.filter((name) => name !== content.name)
+        );
+      }
+    }}
+  />
+</td>
               <td style={tdStyle}>
-                <div style={thumbnailStyle}>썸네일</div>
+                {content.type === "이미지" && content.previewUrl ? (
+  <img
+    src={content.previewUrl}
+    alt={content.name}
+    style={thumbnailImageStyle}
+  />
+) : (
+  <div style={thumbnailStyle}>
+    {content.type === "영상" ? "영상" : "썸네일"}
+  </div>
+)}
               </td>
 
-              <td style={tdStyle}>{content.name}</td>
-              <td style={tdStyle}>{content.type}</td>
-              <td style={tdStyle}>{content.resolution}</td>
-              <td style={tdStyle}>{content.duration}</td>
-              <td style={tdStyle}>{content.size}</td>
-              <td style={tdStyle}>{content.tag}</td>
-              <td style={tdStyle}>{content.date}</td>
+              <td style={tdStyle}>
+  <div style={{ fontWeight: 500 }}>
+    {content.name}
+  </div>
+
+  <div
+  style={{
+    fontSize: "11px",
+    color:
+  !content.startDate && !content.endDate
+    ? "#9CA3AF"
+    : "#666"
+  }}
+>
+  {
+    !content.startDate && !content.endDate
+      ? "무기한"
+      : `${content.startDate || "즉시"} ~ ${content.endDate || "무기한"}`
+  }
+</div>
+</td>
+
+<td style={tdStyle}>{content.brand || "미지정"}</td>
+<td style={tdStyle}>{content.type}</td>
+<td style={tdStyle}>{content.resolution}</td>
+<td style={tdStyle}>{content.duration}</td>
+<td style={tdStyle}>{content.size}</td>
+<td style={tdStyle}>{content.tag}</td>
+<td style={tdStyle}>{content.date}</td>
             </tr>
           ))}
         </tbody>
@@ -514,9 +686,17 @@ const handleAddTag = () => {
     <section style={twoColumnStyle}>
       <div style={panelStyle}>
         <h2>미리보기</h2>
-        <div style={contentPreviewLargeStyle}>
-          {selectedContent.type === "영상" ? "영상 콘텐츠" : "이미지 콘텐츠"}
-        </div>
+        {selectedContent.type === "이미지" && selectedContent.previewUrl ? (
+  <img
+    src={selectedContent.previewUrl}
+    alt={selectedContent.name}
+    style={contentPreviewImageStyle}
+  />
+) : (
+  <div style={contentPreviewLargeStyle}>
+    {selectedContent.type === "영상" ? "영상 콘텐츠" : "이미지 콘텐츠"}
+  </div>
+)}
       </div>
 
       <div style={panelStyle}>
@@ -538,6 +718,14 @@ const handleAddTag = () => {
         {isEditMode && (
   <div style={{ marginTop: "20px" }}>
     <h3>콘텐츠 정보 수정</h3>
+    <div style={formGroupStyle}>
+  <label>콘텐츠명</label>
+  <input
+    style={modalInputStyle}
+    value={editName}
+    onChange={(e) => setEditName(e.target.value)}
+  />
+</div>
 
     <div style={formGroupStyle}>
       <label>브랜드</label>
@@ -614,6 +802,7 @@ const handleAddTag = () => {
           <button
   style={smallButtonStyle}
   onClick={() => {
+    setEditName(selectedContent.name || "");
     setEditBrand(selectedContent.brand || "");
     setEditTag(selectedContent.tag || "");
     setEditStartDate(selectedContent.startDate || "");
@@ -647,13 +836,21 @@ const handleAddTag = () => {
       <div style={formGroupStyle}>
   <label>파일 선택</label>
 
+<label style={fileSelectButtonStyle}>
+  파일 선택
   <input
     type="file"
     multiple
+    style={{ display: "none" }}
     onChange={(e) =>
       setSelectedFiles(Array.from(e.target.files || []).slice(0, 50))
     }
   />
+</label>
+
+<p style={{ marginBottom: "8px" }}>
+  선택 파일 {selectedFiles.length}개
+</p>
 
   <p style={helperTextStyle}>
     1개부터 최대 50개까지 일괄 등록할 수 있습니다.
@@ -671,12 +868,24 @@ const handleAddTag = () => {
         선택 파일 {selectedFiles.length}개
       </p>
 
-      {selectedFiles.map((file) => (
-        <div key={file.name} style={fileItemStyle}>
-          <span>{file.name}</span>
-          <strong>{getContentType(file.name)}</strong>
-        </div>
-      ))}
+      {selectedFiles.map((file, index) => (
+  <div key={`${file.name}-${index}`} style={fileItemStyle}>
+    <span>{file.name}</span>
+
+    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+      <strong>{getContentType(file.name)}</strong>
+
+      <button
+        style={fileDeleteButtonStyle}
+        onClick={() =>
+          setSelectedFiles(selectedFiles.filter((_, i) => i !== index))
+        }
+      >
+        ×
+      </button>
+    </div>
+  </div>
+))}
     </div>
   )}
 </div>
@@ -754,17 +963,30 @@ const handleAddTag = () => {
 </div>
 <div style={modalFooterStyle}>
     <button
-    style={uploadButtonStyle}
-    onClick={handleUpload}
-  >
-    등록
-  </button>
+  style={{
+    ...uploadButtonStyle,
+    opacity: selectedFiles.length === 0 ? 0.5 : 1,
+    cursor: selectedFiles.length === 0 ? "not-allowed" : "pointer"
+  }}
+  onClick={handleUpload}
+  disabled={selectedFiles.length === 0}
+>
+  등록
+</button>
   <button
-    style={closeButtonStyle}
-    onClick={() => setIsUploadModalOpen(false)}
-  >
-    취소
-  </button>
+  style={closeButtonStyle}
+  onClick={() => {
+    setSelectedFiles([]);
+    setUploadStartDate("");
+    setUploadEndDate("");
+    setUploadBrand("");
+    setUploadTag("");
+    setNewTag("");
+    setIsUploadModalOpen(false);
+  }}
+>
+  취소
+</button>
 </div>
     </div>
   </div>
@@ -794,7 +1016,7 @@ const smallButtonStyle = { border: "1px solid #d1d5db", backgroundColor: "#fffff
 const searchInputStyle = { width: "220px", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" as const, marginTop: "16px" };
 const thStyle = { borderBottom: "1px solid #e5e7eb", padding: "12px", textAlign: "left" as const, backgroundColor: "#f9fafb", color: "#374151" };
-const tdStyle = { borderBottom: "1px solid #e5e7eb", padding: "12px" };
+const tdStyle = { borderBottom: "1px solid #e5e7eb", padding: "12px", verticalAlign: "middle" as const, };
 const thumbnailStyle = { width: "100px", height: "56px", borderRadius: "6px", backgroundColor: "#d1d5db", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#374151" };
 const statusBadgeStyle = { fontWeight: "bold" };
 const twoColumnStyle = { display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" };
@@ -875,7 +1097,7 @@ const fileListStyle = {
   borderRadius: "6px",
   padding: "10px",
   backgroundColor: "#f9fafb",
-  maxHeight: "120px",
+  maxHeight: "240px",
   overflowY: "auto" as const,
 };
 
@@ -927,4 +1149,52 @@ const dangerButtonStyle = {
   borderRadius: "6px",
   padding: "8px 12px",
   cursor: "pointer",
+};
+const thumbnailImageStyle = {
+  width: "160px",
+  height: "90px",
+  objectFit: "cover" as const,
+  borderRadius: "6px",
+  border: "1px solid #d1d5db",
+};
+
+const contentPreviewImageStyle = {
+  width: "100%",
+  maxHeight: "420px",
+  objectFit: "contain" as const,
+  borderRadius: "10px",
+  border: "1px solid #d1d5db",
+  backgroundColor: "#f3f4f6",
+};
+const fileSelectButtonStyle = {
+  display: "inline-block",
+  width: "120px",
+  textAlign: "center" as const,
+  backgroundColor: "#2563eb",
+  color: "#ffffff",
+  borderRadius: "6px",
+  padding: "10px 14px",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const fileDeleteButtonStyle = {
+  border: "none",
+  backgroundColor: "#ef4444",
+  color: "#ffffff",
+  borderRadius: "50%",
+  width: "24px",
+  height: "24px",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+const checkAllStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "6px",
+  cursor: "pointer",
+  padding: "6px 8px",
+  borderRadius: "6px",
+  border: "1px solid #e5e7eb",
+  backgroundColor: "#ffffff",
 };
