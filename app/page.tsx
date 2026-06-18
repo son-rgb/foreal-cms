@@ -8,6 +8,25 @@ export default function Home() {
   const normal = total - disconnect;
   const delay = 0;
   const disconnectRate = ((disconnect / total) * 100).toFixed(1);
+  const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
+  const [displayBrand, setDisplayBrand] = useState("");
+const [displayName, setDisplayName] = useState("");
+const [deviceCode, setDeviceCode] = useState("");
+const [displayType, setDisplayType] = useState("LCD");
+const [customDisplayType, setCustomDisplayType] = useState("");
+const [startTime, setStartTime] = useState("");
+const [endTime, setEndTime] = useState("");
+const [isAllDay, setIsAllDay] = useState(false);
+const [locationType, setLocationType] = useState("address");
+const [displayAddress, setDisplayAddress] = useState("");
+const [installEnvironment, setInstallEnvironment] = useState("실내");
+const [viewDirection, setViewDirection] = useState("내부");
+const [displayTag, setDisplayTag] = useState("");
+const [displayStatusFilter, setDisplayStatusFilter] = useState("전체");
+const [displayBrandFilter, setDisplayBrandFilter] = useState("전체");
+const [displaySearchText, setDisplaySearchText] = useState("");
+const [displaySearchType, setDisplaySearchType] = useState("name");
+const [displayDetailTab, setDisplayDetailTab] = useState("manage");
 
   const brands = [
   { name: "뚜레쥬르", count: 420, normal: 410, delay: 0, disconnect: 10 },
@@ -93,6 +112,7 @@ export default function Home() {
 ];
 
   const [selectedDisplay, setSelectedDisplay] = useState(displays[0]);
+  const [displayList, setDisplayList] = useState<any[]>(displays);
 const [selectedBrand, setSelectedBrand] = useState("전체");
 const [currentPage, setCurrentPage] = useState("dashboard");
 const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -135,9 +155,24 @@ const dashboardDisconnectRate = (
 ).toFixed(1);
   const [searchText, setSearchText] = useState("");
 
-const filteredDisplays = displays.filter((display) =>
-  display.name.toLowerCase().includes(searchText.toLowerCase())
-);
+const filteredDisplays = displayList.filter((display) => {
+  const matchesStatus =
+    displayStatusFilter === "전체" || display.status === displayStatusFilter;
+
+  const matchesBrand =
+    displayBrandFilter === "전체" || display.brand === displayBrandFilter;
+
+  const searchTarget =
+  displaySearchType === "deviceCode"
+    ? display.deviceCode || ""
+    : display.name || "";
+
+const matchesSearch = searchTarget
+  .toLowerCase()
+  .includes(displaySearchText.toLowerCase());
+
+  return matchesStatus && matchesBrand && matchesSearch;
+});
 const filteredContents = contentList.filter((content) => {
   const matchesSearch = content.name
     .toLowerCase()
@@ -323,6 +358,58 @@ const handleAddTag = () => {
   setUploadTag(trimmedTag);
   setNewTag("");
 };
+const handleRegisterDisplay = () => {
+  if (!displayBrand) {
+    alert("브랜드를 선택해주세요.");
+    return;
+  }
+
+  if (!displayName.trim()) {
+    alert("디스플레이명을 입력해주세요.");
+    return;
+  }
+
+  if (!deviceCode.trim()) {
+    alert("디바이스코드를 입력해주세요.");
+    return;
+  }
+
+  const nextNumber = displayList.length + 1;
+  const newDisplay = {
+    id: `DSP-${String(nextNumber).padStart(6, "0")}`,
+    name: displayName,
+    brand: displayBrand,
+    deviceCode,
+    displayType: displayType === "기타" ? customDisplayType : displayType,
+    operationTime: isAllDay ? "종일" : `${startTime} ~ ${endTime}`,
+    location: displayAddress || "미입력",
+    environment: installEnvironment,
+    viewDirection,
+    tag: displayTag || "미지정",
+    status: "등록대기",
+    stbSerial: "STB 앱 연동 전",
+    ip: "자동 수집 대기",
+    last: "-",
+  };
+
+  setDisplayList([newDisplay, ...displayList]);
+
+  setDisplayBrand("");
+  setDisplayName("");
+  setDeviceCode("");
+  setDisplayType("LCD");
+  setCustomDisplayType("");
+  setStartTime("");
+  setEndTime("");
+  setIsAllDay(false);
+  setLocationType("address");
+  setDisplayAddress("");
+  setInstallEnvironment("실내");
+  setViewDirection("내부");
+  setDisplayTag("");
+
+  setIsDisplayModalOpen(false);
+};
   return (
     <main style={pageStyle}>
       <aside style={sidebarStyle}>
@@ -345,7 +432,12 @@ const handleAddTag = () => {
   콘텐츠 관리
 </div>
           <div style={menuItemStyle}>편성 관리</div>
-          <div style={menuItemStyle}>디스플레이</div>
+          <div
+  style={currentPage === "display" ? activeMenuStyle : menuItemStyle}
+  onClick={() => setCurrentPage("display")}
+>
+  디스플레이
+</div>
           <div style={menuItemStyle}>리포트</div>
           <div style={menuItemStyle}>점포 관리</div>
         </nav>
@@ -522,7 +614,6 @@ const handleAddTag = () => {
   </button>
 </div>
     </section>
-
     <section style={panelStyle}>
       <div style={panelHeaderStyle}>
         <div style={{ display: "flex", gap: "10px" }}>
@@ -666,6 +757,149 @@ const handleAddTag = () => {
       </table>
     </section>
   </>
+)}
+{currentPage === "display" && (
+  <div>
+    <div style={panelStyle}>
+      <div style={panelHeaderStyle}>
+        <h2>디스플레이 관리</h2>
+        <button
+  style={uploadButtonStyle}
+  onClick={() => setIsDisplayModalOpen(true)}
+>
+  디스플레이 등록
+</button>
+      </div>
+
+      <p style={smallText}>
+        설치된 디스플레이 및 STB 관리
+      </p>
+      <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+  <select
+    style={selectStyle}
+    value={displayStatusFilter}
+    onChange={(e) => setDisplayStatusFilter(e.target.value)}
+  >
+    <option value="전체">네트워크 전체</option>
+    <option value="정상">정상</option>
+    <option value="끊김">끊김</option>
+    <option value="등록대기">등록대기</option>
+  </select>
+
+  <select
+    style={selectStyle}
+    value={displayBrandFilter}
+    onChange={(e) => setDisplayBrandFilter(e.target.value)}
+  >
+    <option value="전체">전체 브랜드</option>
+    {brands.map((brand) => (
+      <option key={brand.name} value={brand.name}>
+        {brand.name}
+      </option>
+    ))}
+  </select>
+
+  <select
+  style={selectStyle}
+  value={displaySearchType}
+  onChange={(e) => {
+  setDisplaySearchType(e.target.value);
+  setDisplaySearchText("");
+}}
+>
+  <option value="name">디스플레이명</option>
+  <option value="deviceCode">디바이스코드</option>
+</select>
+
+  <input
+  style={searchInputStyle}
+  placeholder={
+    displaySearchType === "deviceCode"
+      ? "디바이스코드 검색"
+      : "디스플레이명 검색"
+  }
+  value={displaySearchText}
+  onChange={(e) => setDisplaySearchText(e.target.value)}
+/>
+</div>
+
+      <table style={tableStyle}>
+        <thead>
+         <tr>
+  <th style={thStyle}>NO</th>
+  <th style={thStyle}>네트워크 연결</th>
+  <th style={thStyle}>스크린샷</th>
+  <th style={thStyle}>브랜드</th>
+  <th style={thStyle}>디스플레이명<br />디바이스코드</th>
+  <th style={thStyle}>송출 해상도</th>
+  <th style={thStyle}>운영시간</th>
+  <th style={thStyle}>위치</th>
+  <th style={thStyle}>태그</th>
+</tr>
+        </thead>
+
+        <tbody>
+  {filteredDisplays.map((display, index) => (
+    <tr
+  key={display.id || display.name}
+  style={{ cursor: "pointer" }}
+  onClick={() => {
+    setSelectedDisplay(display);
+    setCurrentPage("displayDetail");
+  }}
+>
+      <td style={tdStyle}>{displayList.length - index}</td>
+
+      <td style={tdStyle}>
+        <span
+          style={{
+            ...statusBadgeStyle,
+            color:
+              display.status === "정상"
+                ? "#34c759"
+                : display.status === "등록대기"
+                ? "#ff9500"
+                : "#ff3b30",
+          }}
+        >
+          ● {display.status}
+        </span>
+      </td>
+
+      <td style={tdStyle}>
+        <div style={thumbnailStyle}>스크린샷<br />준비 중</div>
+      </td>
+
+      <td style={tdStyle}>{display.brand}</td>
+
+      <td style={tdStyle}>
+        <div style={{ fontWeight: "bold", color: "#2563eb" }}>
+          {display.name}
+        </div>
+        <div style={helperTextStyle}>
+          {display.deviceCode || display.id || "-"}
+        </div>
+      </td>
+
+      <td style={tdStyle}>{display.resolution || "1920x1080"}</td>
+
+      <td style={tdStyle}>{display.operationTime || "종일"}</td>
+
+      <td style={tdStyle}>{display.location || "-"}</td>
+
+      <td style={tdStyle}>
+        {display.tag && display.tag !== "미지정" ? (
+          <span style={tagBadgeStyle}>{display.tag}</span>
+        ) : (
+          "-"
+        )}
+      </td>
+    </tr>
+  ))}
+</tbody>
+      </table>
+    </div>
+  </div>
 )}
  {currentPage === "contentDetail" && selectedContent && (
   <>
@@ -824,6 +1058,229 @@ const handleAddTag = () => {
     </section>
   </>
 )}
+{currentPage === "displayDetail" && selectedDisplay && (
+  <>
+    <section style={displayDetailHeaderStyle}>
+  <div>
+    <h1 style={{ margin: 0 }}>
+      디스플레이 &gt; {selectedDisplay.name || "-"}
+    </h1>
+
+    <div style={displayStatusRowStyle}>
+      <span
+        style={{
+          ...displayStatusDotStyle,
+          backgroundColor:
+            selectedDisplay.status === "정상"
+              ? "#34c759"
+              : selectedDisplay.status === "등록대기"
+              ? "#ff9500"
+              : "#ff3b30",
+        }}
+      />
+
+      <strong
+        style={{
+          color:
+            selectedDisplay.status === "정상"
+              ? "#34c759"
+              : selectedDisplay.status === "등록대기"
+              ? "#ff9500"
+              : "#ff3b30",
+        }}
+      >
+        {selectedDisplay.status || "-"}
+      </strong>
+    </div>
+  </div>
+
+  <div style={{ display: "flex", gap: "8px" }}>
+    <button
+      style={smallButtonStyle}
+      onClick={() => setCurrentPage("display")}
+    >
+      ← 목록으로
+    </button>
+
+    <button style={smallButtonStyle}>편성된 편성목록 &gt;</button>
+    <button style={smallButtonStyle}>리포트 &gt;</button>
+    <button style={dangerButtonStyle}>삭제</button>
+  </div>
+</section>
+    <div style={tabMenuStyle}>
+      <button
+        style={displayDetailTab === "manage" ? activeTabStyle : tabButtonStyle}
+        onClick={() => setDisplayDetailTab("manage")}
+      >
+        관리
+      </button>
+
+      <button
+        style={displayDetailTab === "network" ? activeTabStyle : tabButtonStyle}
+        onClick={() => setDisplayDetailTab("network")}
+      >
+        네트워크 연결
+      </button>
+
+      <button
+        style={displayDetailTab === "screenshot" ? activeTabStyle : tabButtonStyle}
+        onClick={() => setDisplayDetailTab("screenshot")}
+      >
+        스크린샷
+      </button>
+    </div>
+
+    {displayDetailTab === "manage" && (
+  <section style={detailGridStyle}>
+
+  <div>
+    <div style={panelStyle}>
+      <div style={panelHeaderStyle}>
+        <h2>디스플레이 기본 정보</h2>
+        <button style={smallButtonStyle}>수정</button>
+      </div>
+
+      <div style={infoGridStyle}>
+        <strong>브랜드</strong>
+        <span>{selectedDisplay.brand || "-"}</span>
+
+        <strong>디스플레이명</strong>
+        <span>{selectedDisplay.name || "-"}</span>
+
+        <strong>디바이스코드</strong>
+        <span>{selectedDisplay.deviceCode || "-"}</span>
+
+        <strong>종류</strong>
+        <span>{selectedDisplay.displayType || "LCD"}</span>
+
+        <strong>송출 해상도</strong>
+        <span>{selectedDisplay.resolution || "1920x1080"}</span>
+
+        <strong>운영 시간</strong>
+        <span>{selectedDisplay.operationTime || "종일"}</span>
+
+        <strong>위치</strong>
+        <span>{selectedDisplay.location || "-"}</span>
+
+        <strong>설치 환경</strong>
+        <span>{selectedDisplay.environment || "실내"}</span>
+
+        <strong>주 시야 방향</strong>
+        <span>{selectedDisplay.viewDirection || "-"}</span>
+
+        <strong>태그</strong>
+        <span>{selectedDisplay.tag || "-"}</span>
+      </div>
+    </div>
+    
+    <div style={panelStyle}>
+  <div style={panelHeaderStyle}>
+    <h2>디바이스 제어</h2>
+
+    <div style={{ display: "flex", gap: "8px" }}>
+      <button style={smallButtonStyle}>재시작</button>
+      <button style={smallButtonStyle}>편성 업데이트</button>
+      <button style={smallButtonStyle}>저장소 초기화</button>
+    </div>
+  </div>
+
+  <div style={controlRowStyle}>
+    <strong>디스플레이 전원</strong>
+    <div style={controlButtonGroupStyle}>
+      <button style={smallButtonStyle}>켜기</button>
+      <button style={smallButtonStyle}>끄기</button>
+    </div>
+  </div>
+
+  <div style={controlRowStyle}>
+    <strong>사운드</strong>
+    <div style={controlButtonGroupStyle}>
+      <input type="range" min="0" max="100" defaultValue="50" />
+      <label style={radioLabelStyle}>
+        <input type="checkbox" />
+        CMS에서 음량 제어
+      </label>
+    </div>
+  </div>
+
+  <div style={controlRowStyle}>
+    <strong>회전</strong>
+    <select style={selectStyle} defaultValue="none">
+      <option value="none">회전 안함</option>
+      <option value="90">90도</option>
+      <option value="180">180도</option>
+      <option value="270">270도</option>
+    </select>
+  </div>
+
+  <div style={controlRowStyle}>
+    <strong>디버그 모드</strong>
+    <div style={controlButtonGroupStyle}>
+      <button style={smallButtonStyle}>켜기</button>
+      <button style={smallButtonStyle}>끄기</button>
+    </div>
+  </div>
+
+  <p style={helperTextStyle}>
+    ※ 제어 기능은 STB가 네트워크에 연결되어 있고, FOREAL 플레이어 앱이 실행 중일 때 동작합니다.
+  </p>
+  </div>
+</div>
+
+    <div>
+      <div style={panelStyle}>
+        <h2>플레이어 앱</h2>
+
+        <div style={infoGridStyle}>
+          <strong>디바이스코드</strong>
+          <span>{selectedDisplay.deviceCode || "-"}</span>
+
+          <strong>앱 버전</strong>
+          <span>{selectedDisplay.appVersion || "자동 수집 대기"}</span>
+
+          <strong>마지막 통신</strong>
+          <span>{selectedDisplay.last || "-"}</span>
+
+          <strong>현재 콘텐츠</strong>
+          <span>{selectedDisplay.content || "편성 전"}</span>
+        </div>
+      </div>
+
+      <div style={panelStyle}>
+        <h2>디바이스 정보</h2>
+
+        <div style={infoGridStyle}>
+          <strong>STB 시리얼</strong>
+          <span>{selectedDisplay.stbSerial || "STB 앱 연동 전"}</span>
+
+          <strong>OS</strong>
+          <span>{selectedDisplay.osVersion || "자동 수집 대기"}</span>
+
+          <strong>저장소</strong>
+          <span>{selectedDisplay.storage || "자동 수집 대기"}</span>
+        </div>
+      </div>
+
+      <div style={panelStyle}>
+        <h2>네트워크</h2>
+
+        <div style={infoGridStyle}>
+          <strong>네트워크 상태</strong>
+          <span>{selectedDisplay.status || "-"}</span>
+
+          <strong>내부 IP</strong>
+          <span>{selectedDisplay.ip || "자동 수집 대기"}</span>
+
+          <strong>외부 IP</strong>
+          <span>{selectedDisplay.publicIp || "자동 수집 대기"}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+)}
+  </>
+)}
         </div>
       </section>
       {isUploadModalOpen && (
@@ -911,7 +1368,6 @@ const handleAddTag = () => {
 />
   </div>
 </div>
-
 <div style={formGroupStyle}>
   <label>브랜드</label>
   <select
@@ -988,6 +1444,212 @@ const handleAddTag = () => {
   취소
 </button>
 </div>
+    </div>
+  </div>
+)}
+{isDisplayModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={modalHeaderStyle}>
+        <h2>디스플레이 등록</h2>
+      </div>
+
+      <div style={formGroupStyle}>
+  <label>브랜드 *</label>
+  <select
+    style={modalInputStyle}
+    value={displayBrand}
+    onChange={(e) => setDisplayBrand(e.target.value)}
+  >
+    <option value="">브랜드 선택</option>
+    {brands.map((brand) => (
+      <option key={brand.name} value={brand.name}>
+        {brand.name}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div style={formGroupStyle}>
+  <label>디스플레이명 *</label>
+  <input
+    style={modalInputStyle}
+    placeholder="디스플레이명 입력"
+    value={displayName}
+    onChange={(e) => setDisplayName(e.target.value)}
+    maxLength={30}
+  />
+  <p style={helperTextStyle}>{displayName.length} / 30자</p>
+</div>
+
+<div style={formGroupStyle}>
+  <label>디바이스코드 *</label>
+  <input
+    style={modalInputStyle}
+    placeholder="셋톱 디바이스코드 입력"
+    value={deviceCode}
+    onChange={(e) => setDeviceCode(e.target.value)}
+  />
+</div>
+
+<div style={formGroupStyle}>
+  <label>종류 *</label>
+  <div style={radioRowStyle}>
+    {["LCD", "LED", "기타"].map((type) => (
+      <label key={type} style={radioLabelStyle}>
+        <input
+          type="radio"
+          checked={displayType === type}
+          onChange={() => setDisplayType(type)}
+        />
+        {type}
+      </label>
+    ))}
+
+    {displayType === "기타" && (
+      <input
+        style={modalInputStyle}
+        placeholder="직접 입력"
+        value={customDisplayType}
+        onChange={(e) => setCustomDisplayType(e.target.value)}
+      />
+    )}
+  </div>
+</div>
+
+<div style={formGroupStyle}>
+  <label>운영시간 *</label>
+  <div style={dateRowStyle}>
+    <input
+      type="time"
+      style={modalInputStyle}
+      value={startTime}
+      onChange={(e) => setStartTime(e.target.value)}
+      disabled={isAllDay}
+    />
+    <input
+      type="time"
+      style={modalInputStyle}
+      value={endTime}
+      onChange={(e) => setEndTime(e.target.value)}
+      disabled={isAllDay}
+    />
+  </div>
+
+  <label style={radioLabelStyle}>
+    <input
+      type="checkbox"
+      checked={isAllDay}
+      onChange={(e) => setIsAllDay(e.target.checked)}
+    />
+    종일
+  </label>
+</div>
+
+<div style={formGroupStyle}>
+  <label>위치</label>
+  <div style={radioRowStyle}>
+    <label style={radioLabelStyle}>
+      <input
+        type="radio"
+        checked={locationType === "address"}
+        onChange={() => setLocationType("address")}
+      />
+      주소 입력
+    </label>
+
+    <label style={radioLabelStyle}>
+      <input
+        type="radio"
+        checked={locationType === "region"}
+        onChange={() => setLocationType("region")}
+      />
+      행정구역까지만 입력
+    </label>
+
+    <label style={radioLabelStyle}>
+      <input
+        type="radio"
+        checked={locationType === "none"}
+        onChange={() => setLocationType("none")}
+      />
+      입력하지 않음
+    </label>
+  </div>
+
+  {locationType !== "none" && (
+    <input
+      style={modalInputStyle}
+      placeholder={locationType === "address" ? "지번 주소 입력" : "행정구역 입력"}
+      value={displayAddress}
+      onChange={(e) => setDisplayAddress(e.target.value)}
+    />
+  )}
+</div>
+
+<div style={formGroupStyle}>
+  <label>설치환경 *</label>
+  <div style={radioRowStyle}>
+    {["실내", "실외"].map((item) => (
+      <label key={item} style={radioLabelStyle}>
+        <input
+          type="radio"
+          checked={installEnvironment === item}
+          onChange={() => setInstallEnvironment(item)}
+        />
+        {item}
+      </label>
+    ))}
+  </div>
+</div>
+
+<div style={formGroupStyle}>
+  <label>주 시야 방향 *</label>
+  <div style={radioRowStyle}>
+    {["내부", "외부"].map((item) => (
+      <label key={item} style={radioLabelStyle}>
+        <input
+          type="radio"
+          checked={viewDirection === item}
+          onChange={() => setViewDirection(item)}
+        />
+        {item}
+      </label>
+    ))}
+  </div>
+</div>
+
+<div style={formGroupStyle}>
+  <label>태그</label>
+  <select
+    style={modalInputStyle}
+    value={displayTag}
+    onChange={(e) => setDisplayTag(e.target.value)}
+  >
+    <option value="">태그 선택</option>
+    {tagList.map((tag) => (
+      <option key={tag} value={tag}>
+        {tag}
+      </option>
+    ))}
+  </select>
+</div>
+
+      <div style={modalFooterStyle}>
+        <button
+          style={closeButtonStyle}
+          onClick={() => setIsDisplayModalOpen(false)}
+        >
+          취소
+        </button>
+
+        <button
+  style={uploadButtonStyle}
+  onClick={handleRegisterDisplay}
+>
+  등록
+</button>
+      </div>
     </div>
   </div>
 )}
@@ -1197,4 +1859,98 @@ const checkAllStyle = {
   borderRadius: "6px",
   border: "1px solid #e5e7eb",
   backgroundColor: "#ffffff",
+};
+const radioRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "16px",
+  flexWrap: "wrap" as const,
+};
+
+const radioLabelStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  cursor: "pointer",
+};
+const tagBadgeStyle = {
+  display: "inline-block",
+  padding: "4px 10px",
+  borderRadius: "999px",
+  backgroundColor: "#dcfce7",
+  color: "#166534",
+  fontSize: "12px",
+  fontWeight: "bold",
+};
+const tabMenuStyle = {
+  display: "flex",
+  gap: "24px",
+  borderBottom: "1px solid #e5e7eb",
+  marginTop: "20px",
+};
+
+const tabButtonStyle = {
+  border: "none",
+  backgroundColor: "transparent",
+  padding: "12px 4px",
+  cursor: "pointer",
+  color: "#6b7280",
+};
+
+const activeTabStyle = {
+  ...tabButtonStyle,
+  color: "#2563eb",
+  borderBottom: "2px solid #2563eb",
+  fontWeight: "bold",
+};
+const detailGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "1.5fr 1fr",
+  gap: "24px",
+};
+
+const infoGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "160px 1fr",
+  rowGap: "16px",
+  columnGap: "20px",
+  marginTop: "16px",
+};
+const controlRowStyle = {
+  display: "grid",
+  gridTemplateColumns: "160px 1fr",
+  alignItems: "center",
+  gap: "16px",
+  padding: "14px 0",
+  borderBottom: "1px solid #e5e7eb",
+};
+
+const controlButtonGroupStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+const displayDetailHeaderStyle = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "10px",
+  padding: "20px 24px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const displayStatusRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  marginTop: "8px",
+  fontSize: "14px",
+};
+
+const displayStatusDotStyle = {
+  width: "8px",
+  height: "8px",
+  borderRadius: "50%",
+  display: "inline-block",
 };
