@@ -27,6 +27,29 @@ const [displayBrandFilter, setDisplayBrandFilter] = useState("전체");
 const [displaySearchText, setDisplaySearchText] = useState("");
 const [displaySearchType, setDisplaySearchType] = useState("name");
 const [displayDetailTab, setDisplayDetailTab] = useState("manage");
+const [selectedNetworkDate, setSelectedNetworkDate] = useState("2026-06-19");
+const [selectedMonitoringDate, setSelectedMonitoringDate] =
+  useState("2026-06-19");
+
+const [monitoringViewCount, setMonitoringViewCount] = useState(6);
+const [selectedCapture, setSelectedCapture] = useState<any>(null);
+const [lastCaptureTime, setLastCaptureTime] = useState("2026-06-19 22:15:30");
+const [manualCaptureLogs, setManualCaptureLogs] = useState<any[]>([]);
+const [lastPowerCommand, setLastPowerCommand] = useState("");
+const [soundVolume, setSoundVolume] = useState(50);
+const [lastDebugCommand, setLastDebugCommand] = useState("");
+const [lastDeviceCommand, setLastDeviceCommand] = useState("");
+const [isDisplayEditModalOpen, setIsDisplayEditModalOpen] = useState(false);
+const [editDisplayBrand, setEditDisplayBrand] = useState("");
+const [editDisplayName, setEditDisplayName] = useState("");
+const [editDisplayTag, setEditDisplayTag] = useState("");
+const [editDisplayType, setEditDisplayType] = useState("LCD");
+const [editDisplayStartTime, setEditDisplayStartTime] = useState("");
+const [editDisplayEndTime, setEditDisplayEndTime] = useState("");
+const [editDisplayIsAllDay, setEditDisplayIsAllDay] = useState(false);
+const [editDisplayAddress, setEditDisplayAddress] = useState("");
+const [editDisplayEnvironment, setEditDisplayEnvironment] = useState("실내");
+const [editDisplayViewDirection, setEditDisplayViewDirection] = useState("내부");
 
   const brands = [
   { name: "뚜레쥬르", count: 420, normal: 410, delay: 0, disconnect: 10 },
@@ -50,6 +73,8 @@ const [displayDetailTab, setDisplayDetailTab] = useState("manage");
       appVersion: "v1.0.3",
       stbSerial: "STB-TBJ-0001",
       ip: "192.168.0.21",
+      lastCommunicationAt: "2026-06-19 21:24:12",
+scheduleUpdatedAt: "2026-06-19 20:58:33",
     },
     {
       name: "KFC_부산서면점_메뉴보드01",
@@ -63,6 +88,8 @@ const [displayDetailTab, setDisplayDetailTab] = useState("manage");
       appVersion: "v1.0.2",
       stbSerial: "STB-KFC-0007",
       ip: "통신 불가",
+      lastCommunicationAt: "2026-06-19 21:24:12",
+scheduleUpdatedAt: "2026-06-19 20:58:33",
     },
     {
       name: "CU_수원역점_광고모니터01",
@@ -76,6 +103,8 @@ const [displayDetailTab, setDisplayDetailTab] = useState("manage");
       appVersion: "v1.0.3",
       stbSerial: "STB-CU-0012",
       ip: "192.168.0.44",
+      lastCommunicationAt: "2026-06-19 21:24:12",
+scheduleUpdatedAt: "2026-06-19 20:58:33",
     },
   ];
   const initialContents = [
@@ -184,6 +213,78 @@ const filteredContents = contentList.filter((content) => {
 
   return matchesSearch && matchesBrand;
 });
+const networkMinuteLogs = Array.from({ length: 1440 }, (_, index) => {
+  if (index >= 0 && index <= 30) return "offline";
+  if (index >= 480 && index <= 520) return "slow";
+  if (index >= 1220 && index <= 1221) return "offline";
+  if (index >= 900 && index <= 940) return "delay";
+  return "normal";
+});
+const today = new Date();
+
+const todayText =
+  `${today.getFullYear()}-` +
+  `${String(today.getMonth() + 1).padStart(2, "0")}-` +
+  `${String(today.getDate()).padStart(2, "0")}`;
+
+const isToday = selectedMonitoringDate === todayText;
+const isFutureDate = selectedMonitoringDate > todayText;
+
+const currentTotalMinutes = today.getHours() * 60 + today.getMinutes();
+const latestCaptureMinute =
+  Math.floor(currentTotalMinutes / 10) * 10;
+
+const monitoringLogCount = isFutureDate
+  ? 0
+  : isToday
+  ? Math.floor(latestCaptureMinute / 10) + 1
+  : 144;
+
+const autoMonitoringLogs = Array.from({ length: monitoringLogCount }, (_, index) => {
+  const totalMinutes = isToday
+    ? latestCaptureMinute - index * 10
+    : 23 * 60 + 50 - index * 10;
+
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+
+  return {
+    id: `auto-${index + 1}`,
+    capturedAt: `${selectedMonitoringDate} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+  };
+});
+
+const monitoringLogs = [
+  ...manualCaptureLogs.filter((log) =>
+    log.capturedAt.startsWith(selectedMonitoringDate)
+  ),
+  ...autoMonitoringLogs,
+];
+
+const visibleMonitoringLogs = monitoringLogs.slice(0, monitoringViewCount);
+const networkSummary = {
+  currentStatus: "정상",
+  lastCommunication: "2026-06-19 21:24:12",
+  uptimeRate30d: "99.2%",
+  disconnectCount30d: "3회",
+  longestDisconnect: "2일 11시간",
+  recentDisconnect: "2026-06-19 20:20 ~ 20:21",
+};
+const getNetworkColor = (status: string) => {
+  if (status === "normal") return "#22c55e";
+  if (status === "delay") return "#facc15";
+  if (status === "slow") return "#9ca3af";
+  if (status === "offline") return "#ef4444";
+  return "#e5e7eb";
+};
+
+const getNetworkLabel = (status: string) => {
+  if (status === "normal") return "정상";
+  if (status === "delay") return "지연";
+  if (status === "slow") return "심한 지연";
+  if (status === "offline") return "끊김";
+  return "미확인";
+};
 const getContentType = (fileName: string) => {
   const lower = fileName.toLowerCase();
 
@@ -341,6 +442,45 @@ const handleSaveEdit = () => {
   setSelectedContent(updatedContent);
   setIsEditMode(false);
 };
+const handleSaveDisplayEdit = () => {
+  if (!selectedDisplay) return;
+
+  if (!editDisplayBrand) {
+    alert("브랜드를 선택해주세요.");
+    return;
+  }
+
+  if (!editDisplayName.trim()) {
+    alert("디스플레이명을 입력해주세요.");
+    return;
+  }
+
+  const updatedDisplay = {
+    ...selectedDisplay,
+    brand: editDisplayBrand,
+    name: editDisplayName,
+    displayType: editDisplayType,
+    operationTime: editDisplayIsAllDay
+      ? "종일"
+      : `${editDisplayStartTime} ~ ${editDisplayEndTime}`,
+    location: editDisplayAddress || "미입력",
+    environment: editDisplayEnvironment,
+    viewDirection: editDisplayViewDirection,
+    tag: editDisplayTag || "미지정",
+  };
+
+  setDisplayList(
+    displayList.map((display) =>
+      (display.id || display.name) ===
+      (selectedDisplay.id || selectedDisplay.name)
+        ? updatedDisplay
+        : display
+    )
+  );
+
+  setSelectedDisplay(updatedDisplay);
+  setIsDisplayEditModalOpen(false);
+};
 const handleAddTag = () => {
   const trimmedTag = newTag.trim();
 
@@ -386,10 +526,12 @@ const handleRegisterDisplay = () => {
     environment: installEnvironment,
     viewDirection,
     tag: displayTag || "미지정",
-    status: "등록대기",
-    stbSerial: "STB 앱 연동 전",
-    ip: "자동 수집 대기",
-    last: "-",
+    status: "정상",
+stbSerial: "STB 앱 연동 전",
+ip: "자동 수집 대기",
+last: "-",
+lastCommunicationAt: "자동 수집 대기",
+scheduleUpdatedAt: "업데이트 이력 없음",
   };
 
   setDisplayList([newDisplay, ...displayList]);
@@ -783,7 +925,6 @@ const handleRegisterDisplay = () => {
     <option value="전체">네트워크 전체</option>
     <option value="정상">정상</option>
     <option value="끊김">끊김</option>
-    <option value="등록대기">등록대기</option>
   </select>
 
   <select
@@ -857,8 +998,6 @@ const handleRegisterDisplay = () => {
             color:
               display.status === "정상"
                 ? "#34c759"
-                : display.status === "등록대기"
-                ? "#ff9500"
                 : "#ff3b30",
           }}
         >
@@ -1073,8 +1212,6 @@ const handleRegisterDisplay = () => {
           backgroundColor:
             selectedDisplay.status === "정상"
               ? "#34c759"
-              : selectedDisplay.status === "등록대기"
-              ? "#ff9500"
               : "#ff3b30",
         }}
       />
@@ -1084,8 +1221,6 @@ const handleRegisterDisplay = () => {
           color:
             selectedDisplay.status === "정상"
               ? "#34c759"
-              : selectedDisplay.status === "등록대기"
-              ? "#ff9500"
               : "#ff3b30",
         }}
       >
@@ -1126,7 +1261,7 @@ const handleRegisterDisplay = () => {
         style={displayDetailTab === "screenshot" ? activeTabStyle : tabButtonStyle}
         onClick={() => setDisplayDetailTab("screenshot")}
       >
-        스크린샷
+        모니터링
       </button>
     </div>
 
@@ -1137,7 +1272,24 @@ const handleRegisterDisplay = () => {
     <div style={panelStyle}>
       <div style={panelHeaderStyle}>
         <h2>디스플레이 기본 정보</h2>
-        <button style={smallButtonStyle}>수정</button>
+        <button
+  style={smallButtonStyle}
+  onClick={() => {
+    setEditDisplayBrand(selectedDisplay.brand || "");
+    setEditDisplayName(selectedDisplay.name || "");
+    setEditDisplayType(selectedDisplay.displayType || "LCD");
+    setEditDisplayStartTime("");
+    setEditDisplayEndTime("");
+    setEditDisplayIsAllDay(selectedDisplay.operationTime === "종일");
+    setEditDisplayAddress(selectedDisplay.location || "");
+    setEditDisplayEnvironment(selectedDisplay.environment || "실내");
+    setEditDisplayViewDirection(selectedDisplay.viewDirection || "내부");
+    setEditDisplayTag(selectedDisplay.tag || "");
+    setIsDisplayEditModalOpen(true);
+  }}
+>
+  수정
+</button>
       </div>
 
       <div style={infoGridStyle}>
@@ -1178,30 +1330,124 @@ const handleRegisterDisplay = () => {
     <h2>디바이스 제어</h2>
 
     <div style={{ display: "flex", gap: "8px" }}>
-      <button style={smallButtonStyle}>재시작</button>
-      <button style={smallButtonStyle}>편성 업데이트</button>
-      <button style={smallButtonStyle}>저장소 초기화</button>
+      <button
+  style={{
+  ...smallButtonStyle,
+  backgroundColor:
+    lastDeviceCommand === "restart"
+      ? "#dcfce7"
+      : "#ffffff",
+  color:
+    lastDeviceCommand === "restart"
+      ? "#16a34a"
+      : "#374151",
+  whiteSpace: "nowrap" as const,
+}}
+  onClick={() => {
+    setLastDeviceCommand("restart");
+    setTimeout(() => setLastDeviceCommand(""), 500);
+  }}
+>
+  재시작
+</button>
+
+<button
+  style={{
+  ...smallButtonStyle,
+  backgroundColor:
+    lastDeviceCommand === "schedule"
+      ? "#dcfce7"
+      : "#ffffff",
+  color:
+    lastDeviceCommand === "schedule"
+      ? "#16a34a"
+      : "#374151",
+  whiteSpace: "nowrap" as const,
+}}
+  onClick={() => {
+    setLastDeviceCommand("schedule");
+    setTimeout(() => setLastDeviceCommand(""), 500);
+  }}
+>
+  편성 업데이트
+</button>
+
+<button
+  style={{
+  ...smallButtonStyle,
+  backgroundColor:
+    lastDeviceCommand === "storage"
+      ? "#fee2e2"
+      : "#ffffff",
+  color:
+    lastDeviceCommand === "storage"
+      ? "#dc2626"
+      : "#374151",
+  whiteSpace: "nowrap" as const,
+}}
+  onClick={() => {
+    setLastDeviceCommand("storage");
+    setTimeout(() => setLastDeviceCommand(""), 500);
+  }}
+>
+  저장소 초기화
+</button>
     </div>
   </div>
 
   <div style={controlRowStyle}>
     <strong>디스플레이 전원</strong>
-    <div style={controlButtonGroupStyle}>
-      <button style={smallButtonStyle}>켜기</button>
-      <button style={smallButtonStyle}>끄기</button>
-    </div>
+
+<div style={controlButtonGroupStyle}>
+  <button
+  style={{
+    ...smallButtonStyle,
+    backgroundColor: lastPowerCommand === "on" ? "#dcfce7" : "#ffffff",
+    color: lastPowerCommand === "on" ? "#16a34a" : "#374151",
+  }}
+  onClick={() => {
+    setLastPowerCommand("on");
+    setTimeout(() => setLastPowerCommand(""), 500);
+  }}
+>
+  전원 켜기
+</button>
+
+<button
+  style={{
+    ...smallButtonStyle,
+    backgroundColor: lastPowerCommand === "off" ? "#fee2e2" : "#ffffff",
+    color: lastPowerCommand === "off" ? "#dc2626" : "#374151",
+  }}
+  onClick={() => {
+    setLastPowerCommand("off");
+    setTimeout(() => setLastPowerCommand(""), 500);
+  }}
+>
+  전원 끄기
+</button>
+</div>
   </div>
 
   <div style={controlRowStyle}>
     <strong>사운드</strong>
+  <div>
     <div style={controlButtonGroupStyle}>
-      <input type="range" min="0" max="100" defaultValue="50" />
-      <label style={radioLabelStyle}>
+      <input  type="range"  min="0"  max="100"  value={soundVolume}  onChange={(e) =>
+          setSoundVolume(Number(e.target.value))}
+/>
+
+<span style={{minWidth: "45px", fontWeight: 600, }}>
+  {soundVolume}%
+</span>
+    </div>
+
+    <label style={{ ...radioLabelStyle, marginTop: "8px"}}>
         <input type="checkbox" />
         CMS에서 음량 제어
       </label>
-    </div>
   </div>
+</div>
 
   <div style={controlRowStyle}>
     <strong>회전</strong>
@@ -1214,15 +1460,54 @@ const handleRegisterDisplay = () => {
   </div>
 
   <div style={controlRowStyle}>
-    <strong>디버그 모드</strong>
-    <div style={controlButtonGroupStyle}>
-      <button style={smallButtonStyle}>켜기</button>
-      <button style={smallButtonStyle}>끄기</button>
-    </div>
+    <div style={controlRowStyle}>
+  <strong>디버그 모드</strong>
+
+  <div style={controlButtonGroupStyle}>
+    <button
+      style={{
+        ...smallButtonStyle, minWidth: "56px",
+        backgroundColor: lastDebugCommand === "on" ? "#dcfce7" : "#ffffff",
+        color: lastDebugCommand === "on" ? "#16a34a" : "#374151",
+      }}
+      onClick={() => {
+        setLastDebugCommand("on");
+        setTimeout(() => setLastDebugCommand(""), 500);
+      }}
+    >
+      켜기
+    </button>
+
+    <button
+      style={{
+        ...smallButtonStyle, minWidth: "56px",
+        backgroundColor: lastDebugCommand === "off" ? "#fee2e2" : "#ffffff",
+        color: lastDebugCommand === "off" ? "#dc2626" : "#374151",
+      }}
+      onClick={() => {
+        setLastDebugCommand("off");
+        setTimeout(() => setLastDebugCommand(""), 500);
+      }}
+    >
+      끄기
+    </button>
+  </div>
+</div>
+<p
+  style={{
+    ...helperTextStyle,
+    marginLeft: "132px",
+    marginTop: "-6px",
+  }}
+>
+  ※ 디버그 모드는 플레이어 로그 및 상태 정보를 화면에 표시하기 위한 기능입니다.
+</p>
   </div>
 
   <p style={helperTextStyle}>
     ※ 제어 기능은 STB가 네트워크에 연결되어 있고, FOREAL 플레이어 앱이 실행 중일 때 동작합니다.
+    <br />
+    ※ 디스플레이 전원은 STB 전원이 아니라 RS232/CEC를 통해 연결된 사이니지 또는 모니터 전원을 제어합니다.
   </p>
   </div>
 </div>
@@ -1239,10 +1524,10 @@ const handleRegisterDisplay = () => {
           <span>{selectedDisplay.appVersion || "자동 수집 대기"}</span>
 
           <strong>마지막 통신</strong>
-          <span>{selectedDisplay.last || "-"}</span>
+<span>{selectedDisplay.lastCommunicationAt || "자동 수집 대기"}</span>
 
-          <strong>현재 콘텐츠</strong>
-          <span>{selectedDisplay.content || "편성 전"}</span>
+<strong>편성 업데이트 일시</strong>
+<span>{selectedDisplay.scheduleUpdatedAt || "업데이트 이력 없음"}</span>
         </div>
       </div>
 
@@ -1278,6 +1563,193 @@ const handleRegisterDisplay = () => {
     </div>
   </section>
   
+)}
+{displayDetailTab === "network" && (
+  <section>
+    <div style={panelStyle}>
+      <div style={panelHeaderStyle}>
+        <div>
+          <h2>네트워크 연결 상태</h2>
+          <p style={helperTextStyle}>
+            선택한 날짜의 24시간 네트워크 상태를 1분 단위로 표시합니다.
+          </p>
+        </div>
+
+        <input
+          type="date"
+          style={selectStyle}
+          value={selectedNetworkDate}
+          onChange={(e) => setSelectedNetworkDate(e.target.value)}
+        />
+      </div>
+
+      <div style={networkLegendStyle}>
+        <span><b style={{ color: "#22c55e" }}>■</b> 정상</span>
+        <span><b style={{ color: "#facc15" }}>■</b> 지연</span>
+        <span><b style={{ color: "#9ca3af" }}>■</b> 심한 지연</span>
+        <span><b style={{ color: "#ef4444" }}>■</b> 끊김</span>
+      </div>
+
+      <div style={networkHeatmapStyle}>
+        {Array.from({ length: 24 }, (_, hour) => (
+          <div key={hour} style={networkHourRowStyle}>
+            <div style={networkHourLabelStyle}>
+              {String(hour).padStart(2, "0")}:00
+            </div>
+
+            <div style={networkMinuteGridStyle}>
+              {networkMinuteLogs
+  .slice(hour * 60, hour * 60 + 60)
+  .flatMap((status, minute) => {
+    const cell = (
+      <div
+        key={`cell-${minute}`}
+        title={`${selectedNetworkDate} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} - ${getNetworkLabel(status)}`}
+        style={{
+          ...networkMinuteCellStyle,
+          backgroundColor: getNetworkColor(status),
+        }}
+      />
+    );
+
+    if ((minute + 1) % 10 === 0 && minute !== 59) {
+      return [
+        cell,
+        <div key={`gap-${minute}`} />,
+      ];
+    }
+
+    return [cell];
+  })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div style={panelStyle}>
+      <h2>네트워크 운영 요약</h2>
+
+      <div style={infoGridStyle}>
+  <strong>현재 상태</strong>
+  <span>{selectedDisplay.status || "-"}</span>
+
+  <strong>마지막 통신</strong>
+  <span>{selectedDisplay.lastCommunicationAt || "자동 수집 대기"}</span>
+
+  <strong>최근 30일 가동률</strong>
+<span>{networkSummary.uptimeRate30d}</span>
+
+<strong>최근 30일 끊김</strong>
+<span>{networkSummary.disconnectCount30d}</span>
+
+<strong>최장 끊김 시간</strong>
+<span>{networkSummary.longestDisconnect}</span>
+
+<strong>최근 끊김 발생</strong>
+<span>{networkSummary.recentDisconnect}</span>
+</div>
+    </div>
+  </section>
+)}
+{displayDetailTab === "screenshot" && (
+  <section style={panelStyle}>
+    <div style={panelHeaderStyle}>
+  <div>
+    <h2>송출 모니터링</h2>
+    <p style={helperTextStyle}>
+      STB에서 일정 주기로 캡처한 실제 플레이어 화면을 확인합니다.
+    </p>
+  </div>
+
+  <div style={{ display: "flex", gap: "8px" }}>
+    <input
+      type="date"
+      style={selectStyle}
+      value={selectedMonitoringDate}
+      onChange={(e) => {
+        setSelectedMonitoringDate(e.target.value);
+        setMonitoringViewCount(6);
+      }}
+    />
+
+    <button
+  style={smallButtonStyle}
+  onClick={() => {
+    const now = new Date();
+
+    const captureTime =
+      `${now.getFullYear()}-` +
+      `${String(now.getMonth() + 1).padStart(2, "0")}-` +
+      `${String(now.getDate()).padStart(2, "0")} ` +
+      `${String(now.getHours()).padStart(2, "0")}:` +
+      `${String(now.getMinutes()).padStart(2, "0")}:` +
+      `${String(now.getSeconds()).padStart(2, "0")}`;
+
+    setLastCaptureTime(captureTime);
+    setSelectedMonitoringDate(captureTime.slice(0, 10));
+setMonitoringViewCount(6);
+  }}
+>
+  캡처 새로고침
+</button>
+  </div>
+</div>
+
+    <div style={monitoringStatusBoxStyle}>
+      <strong style={{ color: "#22c55e", fontSize: "18px" }}>
+        ● 정상 송출
+      </strong>
+      <span style={helperTextStyle}>
+  최근 캡처: {lastCaptureTime}
+</span>
+    </div>
+
+    <div style={monitoringPreviewStyle}>
+      최근 캡처 화면
+    </div>
+
+    <h3 style={{ marginTop: "24px" }}>최근 캡처 이력</h3>
+
+    {visibleMonitoringLogs.length === 0 ? (
+  <div style={emptyMonitoringStyle}>
+    선택한 날짜의 캡처 데이터가 없습니다.
+  </div>
+) : (
+  <div style={monitoringThumbnailGridStyle}>
+    {visibleMonitoringLogs.map((log) => (
+      <div
+        key={log.id}
+        style={monitoringThumbnailCardStyle}
+        onClick={() => setSelectedCapture(log)}
+      >
+        <div style={monitoringThumbnailStyle}>
+          <span style={monitoringThumbnailTimeStyle}>
+            {log.capturedAt.slice(11, 16)}
+          </span>
+          캡처 화면
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+<div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
+  {monitoringViewCount < monitoringLogs.length && (
+    <button
+      style={smallButtonStyle}
+      onClick={() => {
+        if (monitoringViewCount === 6) {
+          setMonitoringViewCount(18);
+        } else {
+          setMonitoringViewCount(monitoringLogs.length);
+        }
+      }}
+    >
+      더보기
+    </button>
+  )}
+</div>
+  </section>
 )}
   </>
 )}
@@ -1653,6 +2125,208 @@ const handleRegisterDisplay = () => {
     </div>
   </div>
 )}
+{isDisplayEditModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={modalHeaderStyle}>
+        <h2>디스플레이 기본정보 수정</h2>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>브랜드 *</label>
+        <select
+          style={modalInputStyle}
+          value={editDisplayBrand}
+          onChange={(e) => setEditDisplayBrand(e.target.value)}
+        >
+          <option value="">브랜드 선택</option>
+          {brands.map((brand) => (
+            <option key={brand.name} value={brand.name}>
+              {brand.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>디스플레이명 *</label>
+        <input
+          style={modalInputStyle}
+          value={editDisplayName}
+          onChange={(e) => setEditDisplayName(e.target.value)}
+        />
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>종류 *</label>
+        <div style={radioRowStyle}>
+          {["LCD", "LED", "기타"].map((type) => (
+            <label key={type} style={radioLabelStyle}>
+              <input
+                type="radio"
+                checked={editDisplayType === type}
+                onChange={() => setEditDisplayType(type)}
+              />
+              {type}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>운영시간 *</label>
+        <div style={dateRowStyle}>
+          <input
+            type="time"
+            style={modalInputStyle}
+            value={editDisplayStartTime}
+            onChange={(e) => setEditDisplayStartTime(e.target.value)}
+            disabled={editDisplayIsAllDay}
+          />
+          <input
+            type="time"
+            style={modalInputStyle}
+            value={editDisplayEndTime}
+            onChange={(e) => setEditDisplayEndTime(e.target.value)}
+            disabled={editDisplayIsAllDay}
+          />
+        </div>
+
+        <label style={radioLabelStyle}>
+          <input
+            type="checkbox"
+            checked={editDisplayIsAllDay}
+            onChange={(e) => setEditDisplayIsAllDay(e.target.checked)}
+          />
+          종일
+        </label>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>주소 *</label>
+        <div style={tagRowStyle}>
+          <input
+            style={modalInputStyle}
+            value={editDisplayAddress}
+            onChange={(e) => setEditDisplayAddress(e.target.value)}
+            placeholder="주소 입력"
+          />
+
+          <button
+            style={closeButtonStyle}
+            onClick={() => alert("주소 검색 기능은 다음 단계에서 연동 예정입니다.")}
+          >
+            주소 검색
+          </button>
+        </div>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>설치환경 *</label>
+        <div style={radioRowStyle}>
+          {["실내", "실외"].map((item) => (
+            <label key={item} style={radioLabelStyle}>
+              <input
+                type="radio"
+                checked={editDisplayEnvironment === item}
+                onChange={() => setEditDisplayEnvironment(item)}
+              />
+              {item}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>주 시야 방향 *</label>
+        <div style={radioRowStyle}>
+          {["내부", "외부"].map((item) => (
+            <label key={item} style={radioLabelStyle}>
+              <input
+                type="radio"
+                checked={editDisplayViewDirection === item}
+                onChange={() => setEditDisplayViewDirection(item)}
+              />
+              {item}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={formGroupStyle}>
+        <label>태그</label>
+        <select
+          style={modalInputStyle}
+          value={editDisplayTag}
+          onChange={(e) => setEditDisplayTag(e.target.value)}
+        >
+          <option value="">태그 선택</option>
+          {tagList.map((tag) => (
+            <option key={tag} value={tag}>
+              {tag}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={modalFooterStyle}>
+        <button
+          style={closeButtonStyle}
+          onClick={() => setIsDisplayEditModalOpen(false)}
+        >
+          취소
+        </button>
+
+        <button
+          style={uploadButtonStyle}
+          onClick={handleSaveDisplayEdit}
+        >
+          저장
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{selectedCapture && (
+  <div
+  style={captureModalOverlayStyle}
+  onClick={() => setSelectedCapture(null)}
+>
+  <div
+    style={captureModalStyle}
+    onClick={(e) => e.stopPropagation()}
+  >
+      <div style={panelHeaderStyle}>
+        <div>
+          <h2>캡처 상세보기</h2>
+          <p style={helperTextStyle}>{selectedCapture.capturedAt}</p>
+        </div>
+
+        <button
+          style={closeButtonStyle}
+          onClick={() => setSelectedCapture(null)}
+        >
+          닫기
+        </button>
+      </div>
+
+      <div style={capturePreviewStyle}>
+        캡처 화면
+      </div>
+
+      <div style={infoGridStyle}>
+        <strong>촬영일시</strong>
+        <span>{selectedCapture.capturedAt}</span>
+
+        <strong>해상도</strong>
+        <span>1920x1080</span>
+
+        <strong>표시 방식</strong>
+        <span>원본 비율 유지</span>
+      </div>
+    </div>
+  </div>
+)}
     </main>
   );
 }
@@ -1918,9 +2592,9 @@ const infoGridStyle = {
 };
 const controlRowStyle = {
   display: "grid",
-  gridTemplateColumns: "160px 1fr",
+  gridTemplateColumns: "120px 1fr",
   alignItems: "center",
-  gap: "16px",
+  gap: "12px",
   padding: "14px 0",
   borderBottom: "1px solid #e5e7eb",
 };
@@ -1953,4 +2627,146 @@ const displayStatusDotStyle = {
   height: "8px",
   borderRadius: "50%",
   display: "inline-block",
+};
+
+const networkLegendStyle = {
+  display: "flex",
+  gap: "18px",
+  marginTop: "16px",
+  marginBottom: "20px",
+  fontSize: "13px",
+  color: "#374151",
+};
+
+const networkHeatmapStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "8px",
+};
+
+const networkHourRowStyle = {
+  display: "grid",
+  gridTemplateColumns: "60px 1fr",
+  alignItems: "center",
+  gap: "10px",
+};
+
+const networkHourLabelStyle = {
+  fontSize: "12px",
+  color: "#6b7280",
+};
+
+const networkMinuteGridStyle = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(10, 24px) 8px repeat(10, 24px) 8px repeat(10, 24px) 8px repeat(10, 24px) 8px repeat(10, 24px) 8px repeat(10, 24px)",
+  columnGap: "4px",
+  rowGap: "2px",
+  alignItems: "center",
+};
+
+const networkMinuteCellStyle = {
+  width: "24px",
+  height: "24px",
+  borderRadius: "1px",
+};
+const monitoringStatusBoxStyle = {
+  marginTop: "20px",
+  padding: "16px",
+  border: "1px solid #dcfce7",
+  borderRadius: "10px",
+  backgroundColor: "#f0fdf4",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const monitoringPreviewStyle = {
+  height: "420px",
+  borderRadius: "10px",
+  backgroundColor: "#d1d5db",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#374151",
+  fontSize: "18px",
+  marginTop: "20px",
+};
+
+const monitoringThumbnailGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(6, 1fr)",
+  gap: "16px",
+  marginTop: "16px",
+};
+
+const monitoringThumbnailCardStyle = {
+  border: "1px solid #e5e7eb",
+  borderRadius: "10px",
+  padding: "12px",
+  backgroundColor: "#ffffff",
+};
+
+const monitoringThumbnailStyle = {
+  height: "90px",
+  borderRadius: "8px",
+  backgroundColor: "#d1d5db",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#374151",
+  fontSize: "12px",
+  position: "relative" as const,
+};
+const monitoringThumbnailTimeStyle = {
+  position: "absolute" as const,
+  right: "8px",
+  bottom: "6px",
+  backgroundColor: "rgba(0,0,0,0.55)",
+  color: "#ffffff",
+  fontSize: "11px",
+  padding: "2px 6px",
+  borderRadius: "4px",
+};
+const emptyMonitoringStyle = {
+  marginTop: "16px",
+  padding: "40px",
+  border: "1px dashed #d1d5db",
+  borderRadius: "10px",
+  backgroundColor: "#f9fafb",
+  textAlign: "center" as const,
+  color: "#6b7280",
+};
+const captureModalOverlayStyle = {
+  position: "fixed" as const,
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 2000,
+};
+
+const captureModalStyle = {
+  width: "1100px",
+  maxWidth: "90vw",
+  backgroundColor: "#ffffff",
+  borderRadius: "12px",
+  padding: "24px",
+};
+
+const capturePreviewStyle = {
+  height: "560px",
+  borderRadius: "10px",
+  backgroundColor: "#d1d5db",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#374151",
+  fontSize: "18px",
+  marginTop: "20px",
+  marginBottom: "20px",
 };
