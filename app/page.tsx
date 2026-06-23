@@ -144,6 +144,49 @@ scheduleUpdatedAt: "2026-06-19 20:58:33",
   const [displayList, setDisplayList] = useState<any[]>(displays);
 const [selectedBrand, setSelectedBrand] = useState("전체");
 const [currentPage, setCurrentPage] = useState("dashboard");
+const [scheduleList, setScheduleList] = useState([
+  {
+    id: 1,
+    name: "뚜레쥬르_여름프로모션",
+    brand: "뚜레쥬르",
+    contentCount: 5,
+    displayCount: 420,
+    period: "2026-06-23 ~ 2026-07-31",
+    status: "운영중",
+    updatedAt: "2026-06-23",
+  },
+  {
+    id: 2,
+    name: "KFC_신메뉴광고",
+    brand: "KFC",
+    contentCount: 3,
+    displayCount: 180,
+    period: "2026-06-20 ~ 2026-07-20",
+    status: "운영중",
+    updatedAt: "2026-06-22",
+  },
+]);
+const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+const [scheduleName, setScheduleName] = useState("");
+const [scheduleBrand, setScheduleBrand] = useState("");
+const [scheduleStartDate, setScheduleStartDate] = useState("");
+const [scheduleEndDate, setScheduleEndDate] = useState("");
+const [scheduleStartTime, setScheduleStartTime] = useState("");
+const [scheduleEndTime, setScheduleEndTime] = useState("");
+const [scheduleIsAllDay, setScheduleIsAllDay] = useState(false);
+const [scheduleMemo, setScheduleMemo] = useState("");
+const [schedulePriority, setSchedulePriority] = useState("보통");
+const [scheduleDays, setScheduleDays] = useState<string[]>([
+  "월",
+  "화",
+  "수",
+  "목",
+  "금",
+  "토",
+  "일",
+]);
+const [scheduleIsUnlimited, setScheduleIsUnlimited] = useState(false);
+const [scheduleTargetType, setScheduleTargetType] = useState("brand");
 const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 const [newTag, setNewTag] = useState("");
@@ -160,6 +203,17 @@ const [contentSearchText, setContentSearchText] = useState("");
 const [contentBrandFilter, setContentBrandFilter] = useState("전체");
 const [selectedContentNames, setSelectedContentNames] = useState<string[]>([]);
 const [selectedContent, setSelectedContent] = useState<any>(null);
+const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
+const [scheduleContents, setScheduleContents] = useState<any[]>([]);
+const [isScheduleContentModalOpen, setIsScheduleContentModalOpen] =
+  useState(false);
+const [selectedScheduleContentNames, setSelectedScheduleContentNames] =
+  useState<string[]>([]);
+const [scheduleContentCounts, setScheduleContentCounts] = useState<{
+  [key: string]: number;
+}>({});
+const [isShuffleModalOpen, setIsShuffleModalOpen] =
+  useState(false);
 const [isEditMode, setIsEditMode] = useState(false);
 const [editBrand, setEditBrand] = useState("");
 const [editName, setEditName] = useState("");
@@ -498,6 +552,176 @@ const handleAddTag = () => {
   setUploadTag(trimmedTag);
   setNewTag("");
 };
+const handleRegisterSchedule = () => {
+  if (!scheduleBrand) {
+    alert("브랜드를 선택해주세요.");
+    return;
+  }
+
+  if (!scheduleName.trim()) {
+    alert("편성명을 입력해주세요.");
+    return;
+  }
+
+  const newSchedule = {
+    id:
+      Math.max(
+        0,
+        ...scheduleList.map((schedule) => schedule.id || 0)
+      ) + 1,
+
+    name: scheduleName,
+
+    brand: scheduleBrand,
+
+    priority: schedulePriority,
+
+    target: "대상 미설정",
+
+    contentCount: 0,
+
+    displayCount: 0,
+
+    period: scheduleIsUnlimited
+      ? `${scheduleStartDate || "즉시"} ~ 무기한`
+      : `${scheduleStartDate || "즉시"} ~ ${
+          scheduleEndDate || "무기한"
+        }`,
+
+    operationTime: scheduleIsAllDay
+      ? "종일"
+      : `${scheduleStartTime || "00:00"} ~ ${
+          scheduleEndTime || "23:59"
+        }`,
+
+    days: scheduleDays.join(", "),
+
+    status: "작성중",
+
+    updatedAt: new Date().toISOString().slice(0, 10),
+  };
+
+  setScheduleList([newSchedule, ...scheduleList]);
+
+  setScheduleBrand("");
+  setScheduleName("");
+  setSchedulePriority("보통");
+
+  setScheduleStartDate("");
+  setScheduleEndDate("");
+
+  setScheduleStartTime("");
+  setScheduleEndTime("");
+
+  setScheduleIsUnlimited(false);
+  setScheduleIsAllDay(false);
+
+  setScheduleDays([
+    "월",
+    "화",
+    "수",
+    "목",
+    "금",
+    "토",
+    "일",
+  ]);
+
+  setIsScheduleModalOpen(false);
+};
+const handleAddScheduleContents = () => {
+  if (selectedScheduleContentNames.length === 0) {
+    alert("추가할 콘텐츠를 선택해주세요.");
+    return;
+  }
+
+  const selectedContents = contentList.filter((content) =>
+    selectedScheduleContentNames.includes(content.name)
+  );
+
+  const expandedContents = selectedContents.flatMap((content) => {
+    const count = scheduleContentCounts[content.name] || 1;
+
+    return Array.from({ length: count }, (_, index) => ({
+      ...content,
+      scheduleContentId: `${content.name}-${Date.now()}-${index}`,
+      playDuration:
+        content.type === "이미지"
+          ? 10
+          : content.duration || "-",
+      playOption: "기본",
+    }));
+  });
+
+  setScheduleContents([...scheduleContents, ...expandedContents]);
+
+  setSelectedScheduleContentNames([]);
+  setScheduleContentCounts({});
+  setIsScheduleContentModalOpen(false);
+};
+const handleChangeScheduleContentOrder = (
+  currentIndex: number,
+  targetIndex: number
+) => {
+  if (currentIndex === targetIndex) return;
+
+  const copiedContents = [...scheduleContents];
+
+  const [movedContent] = copiedContents.splice(currentIndex, 1);
+
+  copiedContents.splice(targetIndex, 0, movedContent);
+
+  setScheduleContents(copiedContents);
+};
+const handleBalancedShuffle = () => {
+  if (scheduleContents.length <= 1) return;
+
+  const groupedContents: {
+    [key: string]: any[];
+  } = {};
+
+  scheduleContents.forEach((content) => {
+    const key = content.name;
+
+    if (!groupedContents[key]) {
+      groupedContents[key] = [];
+    }
+
+    groupedContents[key].push(content);
+  });
+
+  const totalCount = scheduleContents.length;
+  const result: any[] = Array(totalCount).fill(null);
+
+  const groups = Object.entries(groupedContents).sort(
+    (a, b) => b[1].length - a[1].length
+  );
+
+  groups.forEach(([_, items]) => {
+    const count = items.length;
+    const interval = totalCount / count;
+
+    items.forEach((item, index) => {
+      let targetIndex = Math.round(index * interval);
+
+      while (
+        targetIndex < totalCount &&
+        result[targetIndex] !== null
+      ) {
+        targetIndex++;
+      }
+
+      if (targetIndex >= totalCount) {
+        targetIndex = result.findIndex((slot) => slot === null);
+      }
+
+      if (targetIndex !== -1) {
+        result[targetIndex] = item;
+      }
+    });
+  });
+
+  setScheduleContents(result.filter(Boolean));
+};
 const handleRegisterDisplay = () => {
   if (!displayBrand) {
     alert("브랜드를 선택해주세요.");
@@ -573,7 +797,12 @@ scheduleUpdatedAt: "업데이트 이력 없음",
 
   콘텐츠 관리
 </div>
-          <div style={menuItemStyle}>편성 관리</div>
+          <div
+  style={currentPage === "schedule" ? activeMenuStyle : menuItemStyle}
+  onClick={() => setCurrentPage("schedule")}
+>
+  편성 관리
+</div>
           <div
   style={currentPage === "display" ? activeMenuStyle : menuItemStyle}
   onClick={() => setCurrentPage("display")}
@@ -1753,8 +1982,645 @@ setMonitoringViewCount(6);
 )}
   </>
 )}
+{currentPage === "schedule" && (
+  <>
+    <section style={summaryBoxStyle}>
+      <div>
+        <h1>편성 관리</h1>
+        <p style={smallText}>
+          콘텐츠 편성 및 적용 대상 관리
+        </p>
+      </div>
+
+      <button
+  style={uploadButtonStyle}
+  onClick={() => setIsScheduleModalOpen(true)}
+>
+  편성 등록
+</button>
+    </section>
+
+    <section style={panelStyle}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={thStyle}>NO</th>
+            <th style={thStyle}>편성명</th>
+            <th style={thStyle}>브랜드</th>
+            <th style={thStyle}>우선순위</th>
+            <th style={thStyle}>콘텐츠 수</th>
+            <th style={thStyle}>송출 대상</th>
+            <th style={thStyle}>적용 디스플레이</th>
+            <th style={thStyle}>송출 기간</th>
+            <th style={thStyle}>상태</th>
+            <th style={thStyle}>수정일</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {scheduleList.map((schedule, index) => (
+            <tr
+  key={schedule.id}
+  style={{ cursor: "pointer" }}
+  onClick={() => {
+    setSelectedSchedule(schedule);
+    setCurrentPage("scheduleDetail");}}>
+              <td style={tdStyle}>
+                {scheduleList.length - index}
+              </td>
+
+              <td style={tdStyle}>
+                {schedule.name}
+              </td>
+
+              <td style={tdStyle}>
+                {schedule.brand}
+              </td>
+<td style={tdStyle}>
+  {schedule.priority || "보통"}
+</td>
+              <td style={tdStyle}>
+                {schedule.contentCount}개
+              </td>
+              <td style={tdStyle}>
+  {schedule.target || "대상 미설정"}
+</td>
+
+              <td style={tdStyle}>
+                {schedule.displayCount}대
+              </td>
+
+              <td style={tdStyle}>
+                {schedule.period}
+              </td>
+
+              <td style={tdStyle}>
+                {schedule.status}
+              </td>
+
+              <td style={tdStyle}>
+                {schedule.updatedAt}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  </>
+)}
+{currentPage === "scheduleDetail" && selectedSchedule && (
+  <>
+    <section style={displayDetailHeaderStyle}>
+      <div>
+        <h1 style={{ margin: 0 }}>
+          편성 &gt; {selectedSchedule.name || "-"}
+        </h1>
+
+        <p style={helperTextStyle}>
+          편성 기본정보, 콘텐츠 목록, 적용 범위를 관리합니다.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button
+          style={smallButtonStyle}
+          onClick={() => setCurrentPage("schedule")}
+        >
+          ← 목록
+        </button>
+
+        <button style={smallButtonStyle}>
+          배포
+        </button>
+
+        <button style={dangerButtonStyle}>
+          삭제
+        </button>
+      </div>
+    </section>
+
+    <section
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 500px",
+        gap: "16px",
+        alignItems: "start",
+      }}
+    >
+      <div style={panelStyle}>
+        <div style={panelHeaderStyle}>
+          <div>
+            <h2>재생목록</h2>
+            <p style={helperTextStyle}>
+              편성에 포함될 콘텐츠를 순서대로 관리합니다.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+  style={smallButtonStyle}
+  onClick={() => setIsShuffleModalOpen(true)}
+>
+  균등 셔플
+</button>
+
+            <button
+  style={uploadButtonStyle}
+  onClick={() => setIsScheduleContentModalOpen(true)}
+>
+  콘텐츠 추가
+</button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "#f8fafc",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "14px 16px",
+            marginBottom: "14px",
+            display: "flex",
+            gap: "24px",
+            fontSize: "13px",
+          }}
+        >
+          <span>
+            <strong>전체 재생시간</strong> 0초
+          </span>
+          <span>
+            <strong>콘텐츠 용량</strong> 0MB
+          </span>
+          <span>
+            <strong>콘텐츠 개수</strong> 0개
+          </span>
+        </div>
+
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>순서</th>
+              <th style={thStyle}>미리보기</th>
+              <th style={thStyle}>콘텐츠</th>
+              <th style={thStyle}>재생시간</th>
+              <th style={thStyle}>재생옵션</th>
+              <th style={thStyle}>설정</th>
+            </tr>
+          </thead>
+
+         <tbody>
+  {scheduleContents.length === 0 ? (
+    <tr>
+      <td
+        colSpan={6}
+        style={{
+          ...tdStyle,
+          textAlign: "center",
+          padding: "36px",
+          color: "#9ca3af",
+        }}
+      >
+        등록된 편성 콘텐츠가 없습니다.
+      </td>
+    </tr>
+  ) : (
+    scheduleContents.map((content, index) => (
+      <tr key={content.scheduleContentId || `${content.name}-${index}`}>
+        <td style={tdStyle}>
+  <select
+    style={orderSelectStyle}
+    value={index + 1}
+    onChange={(e) =>
+      handleChangeScheduleContentOrder(
+        index,
+        Number(e.target.value) - 1
+      )
+    }
+  >
+    {scheduleContents.map((_, orderIndex) => (
+      <option key={orderIndex + 1} value={orderIndex + 1}>
+        {orderIndex + 1}
+      </option>
+    ))}
+  </select>
+</td>
+
+        <td style={tdStyle}>
+          {content.type === "이미지" && content.previewUrl ? (
+            <img
+              src={content.previewUrl}
+              alt={content.name}
+              style={thumbnailImageStyle}
+            />
+          ) : (
+            <div style={thumbnailStyle}>
+              {content.type === "영상" ? "영상" : "이미지"}
+            </div>
+          )}
+        </td>
+
+        <td style={tdStyle}>
+          <div style={{ fontWeight: 600 }}>
+            {content.name}
+          </div>
+          <div style={helperTextStyle}>
+            {content.brand || "미지정"} · {content.tag || "태그 없음"}
+          </div>
+        </td>
+
+        <td style={tdStyle}>
+          {content.playDuration || content.duration || "-"}
+        </td>
+
+        <td style={tdStyle}>
+          {content.playOption || "기본"}
+        </td>
+
+        <td style={tdStyle}>
+          <button
+            style={dangerButtonStyle}
+            onClick={() => {
+              setScheduleContents(
+                scheduleContents.filter(
+                  (item) =>
+                    item.scheduleContentId !== content.scheduleContentId
+                )
+              );
+            }}
+          >
+            삭제
+          </button>
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
+        </table>
+      </div>
+
+      <aside style={panelStyle}>
+        <div style={panelHeaderStyle}>
+          <h2>편성 정보</h2>
+
+          <button style={smallButtonStyle}>
+            수정
+          </button>
+        </div>
+
+        <div style={infoGridStyle}>
+          <strong>브랜드</strong>
+          <span>{selectedSchedule.brand || "-"}</span>
+
+          <strong>편성명</strong>
+          <span>{selectedSchedule.name || "-"}</span>
+
+          <strong>우선순위</strong>
+          <span>{selectedSchedule.priority || "보통"}</span>
+
+          <strong>송출 기간</strong>
+          <span>{selectedSchedule.period || "-"}</span>
+
+          <strong>운영 시간</strong>
+          <span>{selectedSchedule.operationTime || "-"}</span>
+
+          <strong>요일</strong>
+          <span>
+            {selectedSchedule.days || "월, 화, 수, 목, 금, 토, 일"}
+          </span>
+
+          <strong>송출 대상</strong>
+          <span>{selectedSchedule.target || "대상 미설정"}</span>
+
+          <strong>콘텐츠 수</strong>
+          <span>{selectedSchedule.contentCount || 0}개</span>
+
+          <strong>상태</strong>
+          <span>{selectedSchedule.status || "작성중"}</span>
+
+          <strong>수정일</strong>
+          <span>{selectedSchedule.updatedAt || "-"}</span>
+        </div>
+      </aside>
+    </section>
+  </>
+)}
         </div>
       </section>
+      {isShuffleModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={modalHeaderStyle}>
+        <h2>균등 셔플</h2>
+      </div>
+
+      <p style={smallText}>
+        현재 재생목록 순서가 변경됩니다.
+      </p>
+
+      <p>
+        균등 셔플을 적용하시겠습니까?
+      </p>
+
+      <div style={modalFooterStyle}>
+        <button
+          style={closeButtonStyle}
+          onClick={() => setIsShuffleModalOpen(false)}
+        >
+          취소
+        </button>
+
+        <button
+          style={uploadButtonStyle}
+          onClick={() => {
+            handleBalancedShuffle();
+            setIsShuffleModalOpen(false);
+          }}
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+      {isScheduleContentModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div
+      style={{
+        ...modalStyle,
+        width: "1000px",
+        maxWidth: "95vw",
+      }}
+    >
+      <div style={modalHeaderStyle}>
+        <h2>콘텐츠 선택</h2>
+      </div>
+
+      <p style={helperTextStyle}>
+        편성에 추가할 콘텐츠를 선택합니다.
+      </p>
+
+      <div
+        style={{
+          maxHeight: "500px",
+          overflowY: "auto",
+          border: "1px solid #e5e7eb",
+          borderRadius: "8px",
+        }}
+      >
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>선택</th>
+              <th style={thStyle}>콘텐츠명</th>
+              <th style={thStyle}>브랜드</th>
+              <th style={thStyle}>종류</th>
+              <th style={thStyle}>재생시간</th>
+              <th style={thStyle}>추가 개수</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {contentList.map((content) => (
+              <tr key={content.name}>
+                <td style={tdStyle}>
+                  <input
+                    type="checkbox"
+                    checked={selectedScheduleContentNames.includes(
+                      content.name
+                    )}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedScheduleContentNames([
+                          ...selectedScheduleContentNames,
+                          content.name,
+                        ]);
+                      } else {
+                        setSelectedScheduleContentNames(
+                          selectedScheduleContentNames.filter(
+                            (name) => name !== content.name
+                          )
+                        );
+                      }
+                    }}
+                  />
+                </td>
+
+                <td style={tdStyle}>{content.name}</td>
+
+                <td style={tdStyle}>{content.brand}</td>
+
+                <td style={tdStyle}>{content.type}</td>
+
+                <td style={tdStyle}>
+                  {content.duration || "-"}
+                </td>
+                <td style={tdStyle}>
+  <input
+    type="number"
+    min="1"
+    style={{
+      ...modalInputStyle,
+      width: "80px",
+      textAlign: "center",
+    }}
+    value={scheduleContentCounts[content.name] || 1}
+    onChange={(e) =>
+      setScheduleContentCounts({
+        ...scheduleContentCounts,
+        [content.name]: Number(e.target.value) || 1,
+      })
+    }
+  />
+</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={modalFooterStyle}>
+        <button
+          style={closeButtonStyle}
+          onClick={() => {
+            setSelectedScheduleContentNames([]);
+            setIsScheduleContentModalOpen(false);
+          }}
+        >
+          취소
+        </button>
+
+        <button
+  style={uploadButtonStyle}
+  onClick={handleAddScheduleContents}
+>
+  선택한 콘텐츠 추가
+</button>
+      </div>
+    </div>
+  </div>
+)}
+      {isScheduleModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div style={modalStyle}>
+      <div style={modalHeaderStyle}>
+        <h2>편성 등록</h2>
+      </div>
+
+      <p style={smallText}>
+        편성 기본 정보를 입력합니다.
+      </p>
+<div style={formGroupStyle}>
+  <div style={formGroupStyle}>
+  <label>브랜드 *</label>
+
+  <select
+    style={modalInputStyle}
+    value={scheduleBrand}
+    onChange={(e) => setScheduleBrand(e.target.value)}
+  >
+    <option value="">브랜드 선택</option>
+
+    {brands.map((brand) => (
+      <option
+        key={brand.name}
+        value={brand.name}
+      >
+        {brand.name}
+      </option>
+    ))}
+  </select>
+</div>
+  <label>편성명 *</label>
+  <input
+    style={modalInputStyle}
+    placeholder="예: CU_세로형_기본_전국_260623"
+    value={scheduleName}
+    onChange={(e) => setScheduleName(e.target.value)}
+    maxLength={60}
+  />
+  <p style={helperTextStyle}>{scheduleName.length} / 60자</p>
+</div>
+<div style={formGroupStyle}>
+  <label>우선순위</label>
+
+  <select
+    style={modalInputStyle}
+    value={schedulePriority}
+    onChange={(e) => setSchedulePriority(e.target.value)}
+  >
+    <option value="낮음">낮음</option>
+    <option value="보통">보통</option>
+    <option value="높음">높음</option>
+    <option value="긴급">긴급</option>
+  </select>
+
+  <p style={helperTextStyle}>
+    ※ 같은 시간대에 편성이 겹치면 우선순위가 높은 편성이 송출됩니다.
+  </p>
+</div>
+<div style={dateRowStyle}>
+  <div style={formGroupStyle}>
+    <label>송출 시작일</label>
+    <input
+      type="date"
+      style={modalInputStyle}
+      value={scheduleStartDate}
+      onChange={(e) => setScheduleStartDate(e.target.value)}
+    />
+  </div>
+
+  <div style={formGroupStyle}>
+    <label>송출 종료일</label>
+    <input
+      type="date"
+      style={modalInputStyle}
+      value={scheduleEndDate}
+      onChange={(e) => setScheduleEndDate(e.target.value)}
+      disabled={scheduleIsUnlimited}
+    />
+  </div>
+</div>
+
+<label style={radioLabelStyle}>
+  <input
+    type="checkbox"
+    checked={scheduleIsUnlimited}
+    onChange={(e) => setScheduleIsUnlimited(e.target.checked)}
+  />
+  무기한
+</label>
+<div style={formGroupStyle}>
+  <label>운영 시간</label>
+
+  <div style={dateRowStyle}>
+    <input
+      type="time"
+      style={modalInputStyle}
+      value={scheduleStartTime}
+      onChange={(e) => setScheduleStartTime(e.target.value)}
+      disabled={scheduleIsAllDay}
+    />
+
+    <input
+      type="time"
+      style={modalInputStyle}
+      value={scheduleEndTime}
+      onChange={(e) => setScheduleEndTime(e.target.value)}
+      disabled={scheduleIsAllDay}
+    />
+  </div>
+
+  <label style={radioLabelStyle}>
+    <input
+      type="checkbox"
+      checked={scheduleIsAllDay}
+      onChange={(e) => setScheduleIsAllDay(e.target.checked)}
+    />
+    종일
+  </label>
+</div>
+<div style={formGroupStyle}>
+  <label>요일</label>
+
+  <div style={radioRowStyle}>
+    {["월", "화", "수", "목", "금", "토", "일"].map((day) => (
+      <label key={day} style={radioLabelStyle}>
+        <input
+          type="checkbox"
+          checked={scheduleDays.includes(day)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setScheduleDays([...scheduleDays, day]);
+            } else {
+              setScheduleDays(
+                scheduleDays.filter((item) => item !== day)
+              );
+            }
+          }}
+        />
+        {day}
+      </label>
+    ))}
+  </div>
+</div>
+      <div style={modalFooterStyle}>
+        <button
+          style={closeButtonStyle}
+          onClick={() => setIsScheduleModalOpen(false)}
+        >
+          취소
+        </button>
+
+        <button
+  style={uploadButtonStyle}
+  onClick={handleRegisterSchedule}
+>
+  등록
+</button>
+      </div>
+    </div>
+  </div>
+)}
       {isUploadModalOpen && (
   <div style={modalOverlayStyle}>
     <div style={modalStyle}>
@@ -2363,6 +3229,16 @@ const selectStyle = {
   border: "1px solid #d1d5db",
   borderRadius: "6px",
   backgroundColor: "#ffffff",
+};
+const orderSelectStyle = {
+  width: "80px",
+  height: "40px",
+  border: "1px solid #d1d5db",
+  borderRadius: "4px",
+  fontSize: "12px",
+  padding: "0 4px",
+  backgroundColor: "#ffffff",
+  cursor: "pointer",
 };
 const uploadButtonStyle = {
   backgroundColor: "#2563eb",
